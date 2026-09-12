@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": "poe2-ninja",
+  "name": "poe2.ninja",
+  "description": {
+    "en-US": "Legacy POE2 economy link; may redirect to the combined poe.ninja site.",
+    "zh-CN": "POE2 经济数据入口；可能转至合并后的 poe.ninja。"
+  },
+  "category": "market",
+  "tags": [
+    "market",
+    "tool",
+    "price",
+    "trade",
+    "economy"
+  ],
+  "aliases": {
+    "en-US": [],
+    "zh-CN": [
+      "价格",
+      "市场",
+      "查价",
+      "交易"
+    ]
+  },
+  "games": [
+    "poe2"
+  ],
+  "gameSupportVerified": true,
+  "type": "web",
+  "distribution": "none",
+  "riskLevel": "normal",
+  "official": false,
+  "homepage": "https://poe2.ninja/",
+  "launch": {
+    "url": "https://poe2.ninja/"
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://poe2.ninja/"
+  }
+}

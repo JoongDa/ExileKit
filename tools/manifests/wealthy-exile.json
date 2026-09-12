@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": "wealthy-exile",
+  "name": "Wealthy Exile",
+  "description": {
+    "en-US": "Stash valuation and bulk trading tools.",
+    "zh-CN": "仓库估值与批量交易工具。"
+  },
+  "category": "market",
+  "tags": [
+    "market",
+    "tool",
+    "price",
+    "trade",
+    "economy"
+  ],
+  "aliases": {
+    "en-US": [],
+    "zh-CN": [
+      "价格",
+      "市场",
+      "交易",
+      "仓库"
+    ]
+  },
+  "games": [
+    "poe1"
+  ],
+  "gameSupportVerified": true,
+  "type": "web",
+  "distribution": "none",
+  "riskLevel": "normal",
+  "official": false,
+  "homepage": "https://wealthyexile.com/",
+  "launch": {
+    "url": "https://wealthyexile.com/"
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://wealthyexile.com/"
+  }
+}

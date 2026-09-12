@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "poecharm2",
+  "name": "PoeCharm2",
+  "description": {
+    "en-US": "Chinese Path of Building 2 companion.",
+    "zh-CN": "Path of Building 2 中文版构筑工具。"
+  },
+  "category": "build",
+  "tags": [
+    "build",
+    "build"
+  ],
+  "aliases": {
+    "en-US": [
+      "BD",
+      "build"
+    ],
+    "zh-CN": [
+      "BD",
+      "构筑",
+      "天赋"
+    ]
+  },
+  "games": [
+    "poe2"
+  ],
+  "gameSupportVerified": true,
+  "type": "application",
+  "distribution": "external",
+  "riskLevel": "normal",
+  "official": false,
+  "homepage": "https://github.com/Chuanhsing/PoeCharm2",
+  "launch": {
+    "executableNames": [
+      "PoeCharm3.exe"
+    ]
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://github.com/Chuanhsing/PoeCharm2"
+  },
+  "downloadPage": "https://github.com/Chuanhsing/PoeCharm2",
+  "repository": "https://github.com/Chuanhsing/PoeCharm2"
+}

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "poe2-dust-analysis",
+  "name": "POE2 Dust Analysis",
+  "description": {
+    "en-US": "POE1 dust value analysis on poe2lens; see source notes.",
+    "zh-CN": "poe2lens 上的 POE1 粉尘性价比分析。"
+  },
+  "category": "calculator",
+  "tags": [
+    "calculator",
+    "tool"
+  ],
+  "aliases": {
+    "en-US": [],
+    "zh-CN": [
+      "粉尘",
+      "价格",
+      "计算"
+    ]
+  },
+  "games": [
+    "poe1"
+  ],
+  "gameSupportVerified": true,
+  "type": "web",
+  "distribution": "none",
+  "riskLevel": "normal",
+  "official": false,
+  "homepage": "https://poe2lens.com/dust_analysis.html",
+  "launch": {
+    "url": "https://poe2lens.com/dust_analysis.html"
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://poe2lens.com/about.html"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "craft-of-exile",
+  "name": "Craft of Exile",
+  "description": {
+    "en-US": "Explore crafting methods and probabilities.",
+    "zh-CN": "查询制作方式、词缀与概率。"
+  },
+  "category": "craft",
+  "tags": [
+    "craft",
+    "tool"
+  ],
+  "aliases": {
+    "en-US": [],
+    "zh-CN": [
+      "制作",
+      "工艺",
+      "词缀"
+    ]
+  },
+  "games": [
+    "poe1",
+    "poe2"
+  ],
+  "gameSupportVerified": true,
+  "type": "web",
+  "distribution": "none",
+  "riskLevel": "normal",
+  "official": false,
+  "homepage": "https://www.craftofexile.com/",
+  "launch": {
+    "url": "https://www.craftofexile.com/"
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://www.craftofexile.com/"
+  }
+}

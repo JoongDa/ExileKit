@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "path-of-exile-2",
+  "name": "Path of Exile 2",
+  "description": {
+    "en-US": "Official Path of Exile 2 website.",
+    "zh-CN": "Path of Exile 2 官方网站。"
+  },
+  "category": "official",
+  "tags": [
+    "official",
+    "tool"
+  ],
+  "aliases": {
+    "en-US": [],
+    "zh-CN": [
+      "官方",
+      "游戏"
+    ]
+  },
+  "games": [
+    "poe2"
+  ],
+  "gameSupportVerified": true,
+  "type": "web",
+  "distribution": "none",
+  "riskLevel": "normal",
+  "official": true,
+  "homepage": "https://pathofexile2.com/early-access",
+  "launch": {
+    "url": "https://pathofexile2.com/early-access"
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://pathofexile2.com/early-access"
+  }
+}

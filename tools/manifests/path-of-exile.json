@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "path-of-exile",
+  "name": "Path of Exile",
+  "description": {
+    "en-US": "Official Path of Exile website.",
+    "zh-CN": "Path of Exile 官方网站。"
+  },
+  "category": "official",
+  "tags": [
+    "official",
+    "tool"
+  ],
+  "aliases": {
+    "en-US": [],
+    "zh-CN": [
+      "官方",
+      "游戏"
+    ]
+  },
+  "games": [
+    "poe1"
+  ],
+  "gameSupportVerified": true,
+  "type": "web",
+  "distribution": "none",
+  "riskLevel": "normal",
+  "official": true,
+  "homepage": "https://www.pathofexile.com/",
+  "launch": {
+    "url": "https://www.pathofexile.com/"
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://www.pathofexile.com/"
+  },
+  "icon": "resources/icons/generic-web.png"
+}

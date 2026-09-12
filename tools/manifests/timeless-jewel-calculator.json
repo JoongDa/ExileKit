@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "timeless-jewel-calculator",
+  "name": "Timeless Jewel Calculator",
+  "description": {
+    "en-US": "Inspect timeless jewels and passive tree effects.",
+    "zh-CN": "计算永恒珠宝与天赋树效果。"
+  },
+  "category": "calculator",
+  "tags": [
+    "calculator",
+    "tool"
+  ],
+  "aliases": {
+    "en-US": [],
+    "zh-CN": [
+      "永恒",
+      "珠宝",
+      "计算",
+      "BD"
+    ]
+  },
+  "games": [
+    "poe1"
+  ],
+  "gameSupportVerified": true,
+  "type": "web",
+  "distribution": "none",
+  "riskLevel": "normal",
+  "official": false,
+  "homepage": "https://vilsol.github.io/timeless-jewels/tree",
+  "launch": {
+    "url": "https://vilsol.github.io/timeless-jewels/tree"
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://vilsol.github.io/timeless-jewels/tree"
+  }
+}

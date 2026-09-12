@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "id": "poeredux",
+  "name": "PoeRedux",
+  "description": {
+    "en-US": "Advanced utility that modifies game files.",
+    "zh-CN": "会修改游戏文件的高级工具。"
+  },
+  "category": "utility",
+  "tags": [
+    "utility",
+    "tool"
+  ],
+  "aliases": {
+    "en-US": [],
+    "zh-CN": [
+      "高级",
+      "实用",
+      "工具"
+    ]
+  },
+  "games": [
+    "poe1",
+    "poe2"
+  ],
+  "gameSupportVerified": true,
+  "type": "application",
+  "distribution": "external",
+  "riskLevel": "game_modifying",
+  "official": false,
+  "homepage": "https://github.com/Gineticus/PoeRedux",
+  "launch": {
+    "executableNames": [
+      "PoeRedux-win-x64.exe"
+    ]
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://github.com/Gineticus/PoeRedux"
+  },
+  "downloadPage": "https://github.com/Gineticus/PoeRedux",
+  "repository": "https://github.com/Gineticus/PoeRedux"
+}

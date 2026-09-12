@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "poedb",
+  "name": "PoEDB",
+  "description": {
+    "en-US": "Path of Exile items, skills and game data.",
+    "zh-CN": "Path of Exile 物品、技能与游戏数据库。"
+  },
+  "category": "database",
+  "tags": [
+    "database",
+    "tool"
+  ],
+  "aliases": {
+    "en-US": [],
+    "zh-CN": [
+      "数据库",
+      "物品",
+      "技能"
+    ]
+  },
+  "games": [
+    "poe1"
+  ],
+  "gameSupportVerified": true,
+  "type": "web",
+  "distribution": "none",
+  "riskLevel": "normal",
+  "official": false,
+  "homepage": "https://poedb.tw/us/",
+  "launch": {
+    "url": "https://poedb.tw/us/"
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://poedb.tw/us/"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "id": "poe-overlay",
+  "name": "PoE Overlay",
+  "description": {
+    "en-US": "Price and trade companion; locate the app for your game.",
+    "zh-CN": "查价与交易助手；请选择对应游戏的应用。"
+  },
+  "category": "price-check",
+  "tags": [
+    "price-check",
+    "tool",
+    "price",
+    "trade",
+    "economy"
+  ],
+  "aliases": {
+    "en-US": [],
+    "zh-CN": [
+      "价格",
+      "查价",
+      "交易"
+    ]
+  },
+  "games": [
+    "poe1",
+    "poe2"
+  ],
+  "gameSupportVerified": true,
+  "type": "application",
+  "distribution": "external",
+  "riskLevel": "normal",
+  "official": false,
+  "homepage": "https://www.poeoverlay.com/",
+  "launch": {
+    "executableNames": []
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://www.poeoverlay.com/"
+  },
+  "downloadPage": "https://www.poeoverlay.com/"
+}

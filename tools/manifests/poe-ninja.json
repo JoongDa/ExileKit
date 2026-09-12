@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "poe-ninja",
+  "name": "poe.ninja",
+  "description": {
+    "en-US": "Economy, prices and character builds.",
+    "zh-CN": "经济、市场价格与角色构筑数据。"
+  },
+  "category": "market",
+  "tags": [
+    "market",
+    "tool",
+    "price",
+    "trade",
+    "economy"
+  ],
+  "aliases": {
+    "en-US": [],
+    "zh-CN": [
+      "价格",
+      "市场",
+      "查价",
+      "交易",
+      "BD"
+    ]
+  },
+  "games": [
+    "poe1",
+    "poe2"
+  ],
+  "gameSupportVerified": true,
+  "type": "web",
+  "distribution": "none",
+  "riskLevel": "normal",
+  "official": false,
+  "homepage": "https://poe.ninja/",
+  "launch": {
+    "url": "https://poe.ninja/"
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://poe.ninja/"
+  }
+}

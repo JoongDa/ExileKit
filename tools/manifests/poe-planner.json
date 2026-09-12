@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": "poe-planner",
+  "name": "PoE Planner",
+  "description": {
+    "en-US": "Plan character passive trees and builds.",
+    "zh-CN": "规划角色天赋与 BD 构筑。"
+  },
+  "category": "build",
+  "tags": [
+    "build",
+    "build"
+  ],
+  "aliases": {
+    "en-US": [
+      "BD",
+      "build"
+    ],
+    "zh-CN": [
+      "BD",
+      "构筑",
+      "天赋"
+    ]
+  },
+  "games": [
+    "poe1",
+    "poe2"
+  ],
+  "gameSupportVerified": true,
+  "type": "web",
+  "distribution": "none",
+  "riskLevel": "normal",
+  "official": false,
+  "homepage": "https://poeplanner.com/",
+  "launch": {
+    "url": "https://poeplanner.com/"
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://poeplanner.com/"
+  }
+}

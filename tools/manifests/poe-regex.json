@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "poe-regex",
+  "name": "Path of Exile Regex",
+  "description": {
+    "en-US": "Create search expressions for items and maps.",
+    "zh-CN": "生成物品与地图搜索正则表达式。"
+  },
+  "category": "regex",
+  "tags": [
+    "regex",
+    "tool"
+  ],
+  "aliases": {
+    "en-US": [],
+    "zh-CN": [
+      "正则",
+      "地图",
+      "搜索"
+    ]
+  },
+  "games": [
+    "poe1"
+  ],
+  "gameSupportVerified": true,
+  "type": "web",
+  "distribution": "none",
+  "riskLevel": "normal",
+  "official": false,
+  "homepage": "https://poe.re/",
+  "launch": {
+    "url": "https://poe.re/"
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://poe.re/"
+  }
+}

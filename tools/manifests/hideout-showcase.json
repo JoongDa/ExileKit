@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "hideout-showcase",
+  "name": "Hideout Showcase",
+  "description": {
+    "en-US": "Browse community hideout designs.",
+    "zh-CN": "浏览社区藏身处设计作品。"
+  },
+  "category": "hideout",
+  "tags": [
+    "hideout",
+    "tool"
+  ],
+  "aliases": {
+    "en-US": [],
+    "zh-CN": [
+      "藏身处",
+      "装饰"
+    ]
+  },
+  "games": [
+    "poe1",
+    "poe2"
+  ],
+  "gameSupportVerified": true,
+  "type": "web",
+  "distribution": "none",
+  "riskLevel": "normal",
+  "official": false,
+  "homepage": "https://hideoutshowcase.com/",
+  "launch": {
+    "url": "https://hideoutshowcase.com/"
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "inbound": false
+    }
+  },
+  "verification": {
+    "checkedAt": "2026-09-10",
+    "source": "https://hideoutshowcase.com/"
+  }
+}

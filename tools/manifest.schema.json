@@ -1,0 +1,338 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://poetoolbox.local/schemas/tool-v1.json",
+  "title": "POE Toolbox Tool Manifest v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "description",
+    "category",
+    "tags",
+    "games",
+    "type",
+    "distribution",
+    "riskLevel",
+    "official",
+    "launch"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
+      "not": {
+        "enum": [
+          "con",
+          "prn",
+          "aux",
+          "nul",
+          "com1",
+          "com2",
+          "com3",
+          "com4",
+          "com5",
+          "com6",
+          "com7",
+          "com8",
+          "com9",
+          "lpt1",
+          "lpt2",
+          "lpt3",
+          "lpt4",
+          "lpt5",
+          "lpt6",
+          "lpt7",
+          "lpt8",
+          "lpt9"
+        ]
+      }
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 160,
+      "pattern": "^[^\\u0000]*$",
+      "minLength": 1
+    },
+    "description": {
+      "type": "object",
+      "required": [
+        "en-US"
+      ],
+      "properties": {
+        "en-US": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^[^\\u0000]*$",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 2048,
+        "pattern": "^[^\\u0000]*$"
+      }
+    },
+    "category": {
+      "enum": [
+        "official",
+        "market",
+        "craft",
+        "database",
+        "regex",
+        "build",
+        "hideout",
+        "calculator",
+        "price-check",
+        "trade",
+        "filter",
+        "wiki",
+        "utility"
+      ]
+    },
+    "tags": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "type": "string",
+        "maxLength": 8192,
+        "pattern": "^[^\\u0000]*$"
+      }
+    },
+    "aliases": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "maxItems": 128,
+        "items": {
+          "type": "string",
+          "maxLength": 8192,
+          "pattern": "^[^\\u0000]*$"
+        }
+      }
+    },
+    "games": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "poe1",
+          "poe2"
+        ]
+      }
+    },
+    "gameSupportVerified": {
+      "type": "boolean",
+      "default": true
+    },
+    "type": {
+      "enum": [
+        "web",
+        "application",
+        "builtin",
+        "external-link"
+      ]
+    },
+    "distribution": {
+      "enum": [
+        "none",
+        "external",
+        "managed",
+        "bundled"
+      ]
+    },
+    "riskLevel": {
+      "enum": [
+        "normal",
+        "elevated",
+        "game_modifying"
+      ]
+    },
+    "official": {
+      "type": "boolean"
+    },
+    "author": {
+      "type": "string",
+      "maxLength": 8192,
+      "pattern": "^[^\\u0000]*$"
+    },
+    "homepage": {
+      "type": "string",
+      "maxLength": 8192,
+      "pattern": "^https://[^\\s\\\\@]+$"
+    },
+    "repository": {
+      "type": "string",
+      "maxLength": 8192,
+      "pattern": "^https://[^\\s\\\\@]+$"
+    },
+    "downloadPage": {
+      "type": "string",
+      "maxLength": 8192,
+      "pattern": "^https://[^\\s\\\\@]+$"
+    },
+    "license": {
+      "type": "string",
+      "maxLength": 8192,
+      "pattern": "^[^\\u0000]*$"
+    },
+    "licenseUrl": {
+      "type": "string",
+      "maxLength": 8192,
+      "pattern": "^https://[^\\s\\\\@]+$"
+    },
+    "icon": {
+      "type": "string",
+      "maxLength": 8192,
+      "pattern": "^[^\\u0000]*$",
+      "description": "Bundled path relative to application resources root; C++ additionally enforces canonical containment, no absolute/rooted paths or '..'."
+    },
+    "launch": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "url": {
+          "type": "string",
+          "maxLength": 8192,
+          "pattern": "^https://[^\\s\\\\@]+$"
+        },
+        "executableNames": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "maxLength": 8192,
+            "pattern": "^[^\\u0000]*$"
+          }
+        },
+        "arguments": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "maxLength": 8192,
+            "pattern": "^[^\\u0000]*$"
+          }
+        },
+        "workingDirectory": {
+          "type": "string",
+          "maxLength": 8192,
+          "pattern": "^[^\\u0000]*$"
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8192,
+            "pattern": "^[^\\u0000]*$"
+          }
+        }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "network": {
+          "type": "object",
+          "properties": {
+            "outbound": {
+              "type": "boolean"
+            },
+            "inbound": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "install": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "maxLength": 8192,
+          "pattern": "^[^\\u0000]*$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^(?:[A-Fa-f0-9]{64})?$"
+        }
+      },
+      "additionalProperties": true
+    },
+    "update": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "web",
+              "external-link"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "launch": {
+            "required": [
+              "url"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "application"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "launch": {
+            "required": [
+              "executableNames"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "not": {
+          "properties": {
+            "gameSupportVerified": {
+              "const": false
+            }
+          },
+          "required": [
+            "gameSupportVerified"
+          ]
+        }
+      },
+      "then": {
+        "properties": {
+          "games": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ]
+}
