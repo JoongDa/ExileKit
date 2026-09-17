@@ -53,6 +53,7 @@ void MainWindow::RefreshContent(bool resetScroll) {
     InvalidateRect(window_, nullptr, FALSE);
 }
 void MainWindow::RequestVisibleIcons() {
+    services_.SetIconMetrics(ToolIconDip, dpi_);
     for (const auto &id : page_.VisibleToolIds())
         services_.RequestIcon(id, userEngaged_);
 }

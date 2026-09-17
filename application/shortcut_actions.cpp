@@ -133,8 +133,6 @@ void ApplicationServices::EnqueueNetwork(std::function<void(std::stop_token)> jo
 void ApplicationServices::QueueWebMetadata(std::string id, bool needTitle) {
     if (!data_ || !data_->paths || remoteRequested_.contains(id))
         return;
-    if (!needTitle && data_->icons.contains(id))
-        return;
     std::string url;
     if (const auto custom = data_->config.customTools.find(id); custom != data_->config.customTools.end()) {
         if (custom->second.kind != ShortcutKind::Url)
@@ -148,16 +146,26 @@ void ApplicationServices::QueueWebMetadata(std::string id, bool needTitle) {
     } else
         return;
     remoteRequested_.insert(id);
-    EnqueueNetwork([this, id, url, needTitle, cache = data_->paths->IconCacheDirectory()](std::stop_token stop) {
-        auto result = WebMetadataProvider(cache, httpClient_).Fetch(id, url, needTitle, stop);
+    EnqueueNetwork([this, id, url, needTitle, cache = data_->paths->IconCacheDirectory(),
+                    targetPx = iconTargetPx_](std::stop_token stop) {
+        auto result = WebMetadataProvider(cache, httpClient_).Fetch(id, url, needTitle, stop, targetPx);
         if (!result || stop.stop_requested())
             return;
         Complete(
-            [this, id, url, result = std::move(*result)] {
+            [this, id, url, targetPx, result = std::move(*result)] {
                 if (!HasTool(id))
                     return;
-                if (result.icon)
-                    data_->icons[id] = std::make_shared<IconPixels>(std::move(*result.icon));
+                if (result.icon) {
+                    // Invalidate any older disk read still pending on the local worker.
+                    iconsRequested_[id] = ++nextIconTicket_;
+                    if (targetPx == iconTargetPx_)
+                        data_->icons[id] = std::make_shared<IconPixels>(std::move(*result.icon));
+                    else {
+                        // Decode the original newly cached bytes at the latest DPI, never resize an old display bitmap.
+                        iconsRequested_.erase(id);
+                        RequestIcon(id);
+                    }
+                }
                 if (!result.title.empty()) {
                     ApplyWebsiteTitle(id, url, std::move(result.title));
                 }

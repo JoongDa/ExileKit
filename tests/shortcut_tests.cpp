@@ -165,28 +165,27 @@ int wmain(int argc, wchar_t **argv) {
         std::vector<std::string> arguments{Utf8(linkReport.native())};
         arguments.insert(arguments.end(), payload.begin(), payload.end());
         const auto linkPath = directory / L"用户自定义 名称.lnk";
-        const auto iconPath = source / L"resources/icons/generic-web.png";
-        WriteShortcut(linkPath, executable, workingDirectory, arguments, iconPath, -7);
+        const auto iconPath = source / L"apps/toolbox/exilekit.ico";
+        WriteShortcut(linkPath, executable, workingDirectory, arguments, iconPath, 0);
         const auto shortcut = ParseCustomShortcut(Utf8(linkPath.native()), "custom-lnk");
         const auto details = InspectWindowsShortcut(linkPath);
         Check(shortcut && shortcut->kind == ShortcutKind::WindowsShortcut && shortcut->name == "用户自定义 名称",
               "LNK display name or type was lost");
         Check(details && std::filesystem::equivalent(details->executable, executable) &&
                   std::filesystem::equivalent(details->workingDirectory, workingDirectory) &&
-                  std::filesystem::equivalent(details->iconPath, iconPath) && details->iconIndex == -7 &&
+                  std::filesystem::equivalent(details->iconPath, iconPath) && details->iconIndex == 0 &&
                   details->arguments == arguments, "LNK target, arguments, working directory, or icon metadata was lost");
         Check(!std::filesystem::exists(linkReport), "Inspecting a shortcut executed its target");
         const auto ownIcon = IconProvider(output / L"icons").LoadCustom(*shortcut);
-        const auto expectedIcon = IconProvider::DecodeFile(iconPath);
-        Check(ownIcon && expectedIcon && ownIcon->bgra == expectedIcon->bgra,
-              "LNK did not prefer its own icon over the target executable");
-        Check(!IconProvider(output / L"icons").LoadCustom(*application),
-              "Icon-free fixture should use the UI placeholder");
+        const auto genericIcon = IconProvider(output / L"icons").LoadCustom(*application);
+        Check(ownIcon && ownIcon->source == "Shell" && genericIcon && ownIcon->bgra != genericIcon->bgra,
+              "Shell did not honor the shortcut icon override");
+        Check(genericIcon->source == "Shell", "Icon-free fixture should receive the Shell generic icon");
         const auto noIconLink = directory / L"no-icon.lnk";
         WriteShortcut(noIconLink, executable, workingDirectory, {}, directory / L"missing.ico");
         const auto noIconShortcut = ParseCustomShortcut(Utf8(noIconLink.native()), "custom-no-icon");
-        Check(noIconShortcut && !IconProvider(output / L"icons").LoadCustom(*noIconShortcut),
-              "Missing shortcut and target icons should use the UI placeholder");
+        Check(noIconShortcut && IconProvider(output / L"icons").LoadCustom(*noIconShortcut).has_value(),
+              "Missing shortcut and target icons should receive the Shell generic icon");
         Check(!std::filesystem::exists(linkReport), "Reading shortcut icons executed the target");
         CheckConfigBounds(output, executable, workingDirectory, arguments);
         Check(ToolLauncher().LaunchCustom(*shortcut).has_value(), "Real LNK launch failed");

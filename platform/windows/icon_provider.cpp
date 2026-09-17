@@ -5,20 +5,55 @@
 #include <algorithm>
 #include <fstream>
 #include <shellapi.h>
+#include <shlobj.h>
+#include <cmath>
 #include <wincodec.h>
 #include <wrl/client.h>
 namespace poetoolbox {
 namespace {
-Result<IconPixels> Decode(std::span<const uint8_t> bytes) {
+using Microsoft::WRL::ComPtr;
+Result<IconPixels> Convert(IWICImagingFactory *factory, IWICBitmapSource *source, uint32_t targetPx,
+                           const char *origin) {
+    UINT w = 0, h = 0;
+    auto hr = source->GetSize(&w, &h);
+    if (FAILED(hr) || !w || !h || w > 4096 || h > 4096)
+        return std::unexpected(Error{ErrorCode::IoError, "Cannot decode bounded icon."});
+    targetPx = std::clamp(targetPx, 1u, 512u);
+    // Never synthesize detail by upscaling a small source. Preserve aspect ratio.
+    const double factor = std::min({1.0, double(targetPx) / w, double(targetPx) / h});
+    const UINT sw = std::max(1u, static_cast<UINT>(std::lround(w * factor)));
+    const UINT sh = std::max(1u, static_cast<UINT>(std::lround(h * factor)));
+    ComPtr<IWICBitmapScaler> scaler;
+    ComPtr<IWICFormatConverter> converter;
+    if (sw != w || sh != h) {
+        hr = factory->CreateBitmapScaler(&scaler);
+        if (SUCCEEDED(hr))
+            hr = scaler->Initialize(source, sw, sh, WICBitmapInterpolationModeFant);
+        if (SUCCEEDED(hr))
+            source = scaler.Get();
+    }
+    if (SUCCEEDED(hr))
+        hr = factory->CreateFormatConverter(&converter);
+    if (SUCCEEDED(hr))
+        hr = converter->Initialize(source, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0,
+                                   WICBitmapPaletteTypeCustom);
+    IconPixels pixels{sw, sh, std::vector<uint8_t>(sw * sh * 4)};
+    if (SUCCEEDED(hr))
+        hr = converter->CopyPixels(nullptr, sw * 4, static_cast<UINT>(pixels.bgra.size()), pixels.bgra.data());
+    if (FAILED(hr))
+        return std::unexpected(Error{ErrorCode::IoError, "Icon conversion failed.", static_cast<uint32_t>(hr)});
+    pixels.sourceWidth = w;
+    pixels.sourceHeight = h;
+    pixels.requestedPx = targetPx;
+    pixels.source = origin;
+    return pixels;
+}
+Result<IconPixels> Decode(std::span<const uint8_t> bytes, uint32_t targetPx) {
     if (bytes.empty() || bytes.size() > 2 * 1024 * 1024)
         return std::unexpected(Error{ErrorCode::IoError, "Icon is empty or exceeds 2 MiB."});
-    using Microsoft::WRL::ComPtr;
     ComPtr<IWICImagingFactory> factory;
     ComPtr<IWICStream> stream;
     ComPtr<IWICBitmapDecoder> decoder;
-    ComPtr<IWICBitmapFrameDecode> frame;
-    ComPtr<IWICBitmapScaler> scaler;
-    ComPtr<IWICFormatConverter> converter;
     auto hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
     if (SUCCEEDED(hr))
         hr = factory->CreateStream(&stream);
@@ -26,82 +61,81 @@ Result<IconPixels> Decode(std::span<const uint8_t> bytes) {
         hr = stream->InitializeFromMemory(const_cast<BYTE *>(bytes.data()), static_cast<DWORD>(bytes.size()));
     if (SUCCEEDED(hr))
         hr = factory->CreateDecoderFromStream(stream.Get(), nullptr, WICDecodeMetadataCacheOnDemand, &decoder);
+    UINT count = 0;
     if (SUCCEEDED(hr))
-        hr = decoder->GetFrame(0, &frame);
-    UINT w = 0, h = 0;
-    if (SUCCEEDED(hr))
-        hr = frame->GetSize(&w, &h);
-    if (FAILED(hr) || w == 0 || h == 0 || w > 4096 || h > 4096)
-        return std::unexpected(Error{ErrorCode::IoError, "Cannot decode bounded icon."});
-    const float factor = std::min(64.0f / w, 64.0f / h);
-    const UINT sw = std::max(1u, static_cast<UINT>(w * factor)), sh = std::max(1u, static_cast<UINT>(h * factor));
-    hr = factory->CreateBitmapScaler(&scaler);
-    if (SUCCEEDED(hr))
-        hr = scaler->Initialize(frame.Get(), sw, sh, WICBitmapInterpolationModeFant);
-    if (SUCCEEDED(hr))
-        hr = factory->CreateFormatConverter(&converter);
-    if (SUCCEEDED(hr))
-        hr = converter->Initialize(scaler.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0,
-                                   WICBitmapPaletteTypeCustom);
-    IconPixels pixels{sw, sh, std::vector<uint8_t>(sw * sh * 4)};
-    if (SUCCEEDED(hr))
-        hr = converter->CopyPixels(nullptr, sw * 4, static_cast<UINT>(pixels.bgra.size()), pixels.bgra.data());
-    if (FAILED(hr))
-        return std::unexpected(Error{ErrorCode::IoError, "Icon conversion failed.", static_cast<uint32_t>(hr)});
-    return pixels;
+        hr = decoder->GetFrameCount(&count);
+    if (FAILED(hr) || !count || count > 256)
+        return std::unexpected(Error{ErrorCode::IoError, "Cannot decode bounded icon frames."});
+    ComPtr<IWICBitmapFrameDecode> best;
+    UINT bestSize = 0;
+    targetPx = std::clamp(targetPx, 1u, 512u);
+    for (UINT i = 0; i < count; ++i) {
+        ComPtr<IWICBitmapFrameDecode> frame;
+        UINT w = 0, h = 0;
+        if (FAILED(decoder->GetFrame(i, &frame)) || FAILED(frame->GetSize(&w, &h)) || !w || !h || w > 4096 || h > 4096)
+            continue;
+        const auto size = std::min(w, h);
+        if (!best || (size >= targetPx && (bestSize < targetPx || size < bestSize)) ||
+            (size < targetPx && bestSize < targetPx && size > bestSize)) {
+            best = frame;
+            bestSize = size;
+        }
+    }
+    if (!best)
+        return std::unexpected(Error{ErrorCode::IoError, "No usable icon frame."});
+    return Convert(factory.Get(), best.Get(), targetPx, "WIC");
 }
-Result<IconPixels> FromExe(const std::filesystem::path &file, int index = 0) {
+Result<IconPixels> FromShell(const std::filesystem::path &file, uint32_t targetPx) {
+    ComPtr<IShellItemImageFactory> item;
+    auto hr =
+        SHCreateItemFromParsingName(file.lexically_normal().make_preferred().c_str(), nullptr, IID_PPV_ARGS(&item));
+    HBITMAP bitmap = nullptr;
+    const auto requested = static_cast<LONG>(IconProvider::SourcePixels(targetPx));
+    if (SUCCEEDED(hr))
+        hr = item->GetImage({requested, requested}, SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK, &bitmap);
+    ComPtr<IWICImagingFactory> factory;
+    ComPtr<IWICBitmap> source;
+    if (SUCCEEDED(hr))
+        hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
+    if (SUCCEEDED(hr))
+        hr = factory->CreateBitmapFromHBITMAP(bitmap, nullptr, WICBitmapUsePremultipliedAlpha, &source);
+    if (bitmap)
+        DeleteObject(bitmap);
+    if (FAILED(hr))
+        return std::unexpected(Error{ErrorCode::IoError, "Shell icon unavailable.", static_cast<uint32_t>(hr)});
+    return Convert(factory.Get(), source.Get(), targetPx, "Shell");
+}
+Result<IconPixels> FromExe(const std::filesystem::path &file, uint32_t targetPx, int index = 0) {
     HICON icon = nullptr;
     if (ExtractIconExW(file.c_str(), index, &icon, nullptr, 1) != 1 || !icon)
         return std::unexpected(Error{ErrorCode::IoError, "EXE icon unavailable."});
-    BITMAPINFO info{};
-    info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    info.bmiHeader.biWidth = 64;
-    info.bmiHeader.biHeight = -64;
-    info.bmiHeader.biPlanes = 1;
-    info.bmiHeader.biBitCount = 32;
-    info.bmiHeader.biCompression = BI_RGB;
-    void *bits = nullptr;
-    HDC dc = CreateCompatibleDC(nullptr);
-    HBITMAP bitmap = CreateDIBSection(dc, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
-    if (!dc || !bitmap) {
-        if (bitmap)
-            DeleteObject(bitmap);
-        if (dc)
-            DeleteDC(dc);
-        DestroyIcon(icon);
-        return std::unexpected(Error{ErrorCode::IoError, "Cannot allocate icon surface."});
-    }
-    auto old = SelectObject(dc, bitmap);
-    ZeroMemory(bits, 64 * 64 * 4);
-    const auto drawn = DrawIconEx(dc, 0, 0, icon, 64, 64, 0, nullptr, DI_NORMAL);
-    IconPixels pixels{64, 64, std::vector<uint8_t>(64 * 64 * 4)};
-    if (drawn)
-        memcpy(pixels.bgra.data(), bits, pixels.bgra.size());
-    SelectObject(dc, old);
-    DeleteObject(bitmap);
-    DeleteDC(dc);
+    ComPtr<IWICImagingFactory> factory;
+    ComPtr<IWICBitmap> source;
+    auto hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
+    if (SUCCEEDED(hr))
+        hr = factory->CreateBitmapFromHICON(icon, &source);
     DestroyIcon(icon);
-    if (!drawn)
-        return std::unexpected(Error{ErrorCode::IoError, "Cannot draw executable icon."});
-    // Legacy icons have no alpha channel; give their nonzero pixels opaque alpha.
-    bool alpha = false;
-    for (size_t i = 3; i < pixels.bgra.size(); i += 4)
-        if (pixels.bgra[i]) {
-            alpha = true;
-            break;
-        }
-    if (!alpha)
-        for (size_t i = 0; i < pixels.bgra.size(); i += 4)
-            if (pixels.bgra[i] || pixels.bgra[i + 1] || pixels.bgra[i + 2])
-                pixels.bgra[i + 3] = 255;
-    return pixels;
+    if (FAILED(hr))
+        return std::unexpected(Error{ErrorCode::IoError, "Legacy icon conversion failed.", static_cast<uint32_t>(hr)});
+    return Convert(factory.Get(), source.Get(), targetPx, "ExtractIconEx");
 }
 } // namespace
-Result<IconPixels> IconProvider::DecodeBytes(std::span<const uint8_t> bytes) {
-    return Decode(bytes);
+uint32_t IconProvider::TargetPixels(float dip, float dpi) {
+    if (!std::isfinite(dip) || !std::isfinite(dpi) || dip <= 0 || dpi <= 0)
+        return 64;
+    return static_cast<uint32_t>(std::clamp(std::ceil(double(dip) * dpi / 96.0), 1.0, 512.0));
 }
-Result<IconPixels> IconProvider::DecodeFile(const std::filesystem::path &file) {
+uint32_t IconProvider::SourcePixels(uint32_t targetPx) {
+    if (targetPx < 128)
+        return 128;
+    if (targetPx < 256)
+        return 256;
+    return 512;
+}
+Result<IconPixels> IconProvider::DecodeBytes(std::span<const uint8_t> bytes, uint32_t targetPx) {
+    return Decode(bytes, targetPx);
+}
+Result<IconPixels> IconProvider::DecodeFile(const std::filesystem::path &file, uint32_t targetPx) {
     std::error_code ec;
     const auto size = std::filesystem::file_size(file, ec);
     if (ec || size == 0 || size > 2 * 1024 * 1024)
@@ -110,10 +144,10 @@ Result<IconPixels> IconProvider::DecodeFile(const std::filesystem::path &file) {
     std::vector<uint8_t> bytes(static_cast<size_t>(size));
     if (!stream.read(reinterpret_cast<char *>(bytes.data()), static_cast<std::streamsize>(bytes.size())))
         return std::unexpected(Error{ErrorCode::IoError, "Cannot read icon."});
-    return Decode(bytes);
+    return Decode(bytes, targetPx);
 }
 Result<IconPixels> IconProvider::Load(const ToolManifest &tool, const std::filesystem::path &executable,
-                                      const std::filesystem::path &root) const {
+                                      const std::filesystem::path &root, uint32_t targetPx) const {
     if (!IsValidToolId(tool.id))
         return std::unexpected(Error{ErrorCode::InvalidManifest, "Invalid icon key."});
     if (!tool.icon.empty()) {
@@ -128,7 +162,7 @@ Result<IconPixels> IconProvider::Load(const ToolManifest &tool, const std::files
                     if (p == "..")
                         contained = false;
                 if (contained) {
-                    auto local = DecodeFile(file);
+                    auto local = DecodeFile(file, targetPx);
                     if (local)
                         return local;
                 }
@@ -136,43 +170,51 @@ Result<IconPixels> IconProvider::Load(const ToolManifest &tool, const std::files
         }
     }
     if (tool.type == ToolType::Application && !executable.empty()) {
-        auto icon = FromExe(executable);
+        auto icon = FromShell(executable, targetPx);
+        if (!icon)
+            icon = FromExe(executable, targetPx);
         if (icon)
             return icon;
     }
     if (tool.type == ToolType::Web || tool.type == ToolType::ExternalLink)
-        for (const auto *ext : {L".png", L".ico", L".icon"}) {
-            auto cached = DecodeFile(cache_ / (Utf16(tool.id) + ext));
+        for (const auto *ext : {L".icon", L".png", L".ico"}) {
+            auto cached = DecodeFile(cache_ / (Utf16(tool.id) + ext), targetPx);
             if (cached)
                 return cached;
         }
     return std::unexpected(Error{ErrorCode::IoError, "No local icon; use placeholder."});
 }
-Result<IconPixels> IconProvider::LoadCustom(const CustomTool &tool) const {
+Result<IconPixels> IconProvider::LoadCustom(const CustomTool &tool, uint32_t targetPx) const {
     if (!IsValidToolId(tool.id))
         return std::unexpected(Error{ErrorCode::InvalidPath, "Invalid custom icon key."});
     if (tool.kind == ShortcutKind::Url) {
         ToolManifest manifest;
         manifest.id = tool.id;
         manifest.type = ToolType::Web;
-        return Load(manifest, {}, {});
+        return Load(manifest, {}, {}, targetPx);
     }
     const std::filesystem::path path(Utf16(tool.target));
     if (!path.is_absolute())
         return std::unexpected(Error{ErrorCode::InvalidPath, "Custom icon target must be absolute."});
+    auto shell = FromShell(path, targetPx);
+    if (shell)
+        return shell;
     if (tool.kind == ShortcutKind::Executable)
-        return FromExe(path);
+        return FromExe(path, targetPx);
     auto shortcut = InspectWindowsShortcut(path);
     if (!shortcut)
         return std::unexpected(shortcut.error());
     if (!shortcut->iconPath.empty()) {
-        auto own = FromExe(shortcut->iconPath, shortcut->iconIndex);
-        if (own)
-            return own;
-        auto image = DecodeFile(shortcut->iconPath);
+        auto image = DecodeFile(shortcut->iconPath, targetPx);
         if (image)
             return image;
+        auto own = FromExe(shortcut->iconPath, targetPx, shortcut->iconIndex);
+        if (own)
+            return own;
     }
-    return FromExe(shortcut->executable);
+    auto target = FromShell(shortcut->executable, targetPx);
+    if (target)
+        return target;
+    return FromExe(shortcut->executable, targetPx);
 }
 } // namespace poetoolbox

@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 namespace poetoolbox::ui {
+inline constexpr float ToolIconDip = 72;
 struct ToolIconModel {
     std::string id;
     std::wstring name, description, monogram, risk;
@@ -17,7 +18,7 @@ inline void DrawToolIconItem(Renderer &renderer, const ToolIconModel &model, D2D
                              bool addShortcut = false) {
     if (hover)
         renderer.Fill(r, 0x202731, 10);
-    constexpr float iconSize = 72;
+    constexpr float iconSize = ToolIconDip;
     const float x = (r.left + r.right - iconSize) / 2, y = r.top + 8;
     const auto icon = D2D1::RectF(x, y, x + iconSize, y + iconSize);
     if (addShortcut) {

@@ -305,18 +305,37 @@ void ApplicationServices::OpenDownloadPage(std::string id) {
             Complete([this, error = result.error()] { ReportError(error); });
     });
 }
+void ApplicationServices::SetIconMetrics(float dip, float dpi) {
+    const auto pixels = IconProvider::TargetPixels(dip, dpi);
+    if (pixels == iconTargetPx_)
+        return;
+    iconTargetPx_ = pixels;
+    iconsRequested_.clear();
+    if (data_)
+        data_->icons.clear();
+}
 void ApplicationServices::RequestIcon(std::string id, bool allowRemote) {
+    if (!data_ || !data_->paths)
+        return;
     if (allowRemote)
         QueueWebMetadata(id);
-    if (!data_ || !data_->paths || iconsRequested_.contains(id))
+    if (iconsRequested_.contains(id))
         return;
+    const auto targetPx = iconTargetPx_;
+    const auto ticket = ++nextIconTicket_;
     if (const auto custom = data_->config.customTools.find(id); custom != data_->config.customTools.end()) {
-        iconsRequested_.insert(id);
-        Enqueue([this, tool = custom->second, cache = data_->paths->IconCacheDirectory()] {
-            const auto icon = IconProvider(cache).LoadCustom(tool);
+        iconsRequested_[id] = ticket;
+        Enqueue([this, tool = custom->second, cache = data_->paths->IconCacheDirectory(), targetPx, ticket] {
+            const auto icon = IconProvider(cache).LoadCustom(tool, targetPx);
             if (icon) {
                 auto pixels = std::make_shared<IconPixels>(*icon);
-                Complete([this, id = tool.id, pixels] { data_->icons[id] = pixels; }, tool.id);
+                Complete(
+                    [this, id = tool.id, pixels, ticket] {
+                        if (const auto request = iconsRequested_.find(id);
+                            request != iconsRequested_.end() && request->second == ticket)
+                            data_->icons[id] = pixels;
+                    },
+                    tool.id);
             }
         });
         return;
@@ -324,19 +343,21 @@ void ApplicationServices::RequestIcon(std::string id, bool allowRemote) {
     const auto *tool = data_->registry.FindTool(id);
     if (!tool)
         return;
-    iconsRequested_.insert(id);
+    iconsRequested_[id] = ticket;
     const auto path = data_->config.executablePaths.find(id);
     const auto executable = path == data_->config.executablePaths.end() ? std::filesystem::path{} : path->second;
-    Enqueue([this, id, manifest = tool->manifest, executable, cache = data_->paths->IconCacheDirectory()] {
-        const auto icon = IconProvider(cache).Load(manifest, executable, root_);
+    Enqueue([this, id, manifest = tool->manifest, executable, cache = data_->paths->IconCacheDirectory(), targetPx,
+             ticket] {
+        const auto icon = IconProvider(cache).Load(manifest, executable, root_, targetPx);
         if (icon) {
             auto pixels = std::make_shared<IconPixels>(*icon);
             Complete(
-                [this, id, pixels, executable] {
+                [this, id, pixels, executable, ticket] {
                     const auto entry = data_->config.executablePaths.find(id);
                     const auto current =
                         entry == data_->config.executablePaths.end() ? std::filesystem::path{} : entry->second;
-                    if (current == executable)
+                    const auto request = iconsRequested_.find(id);
+                    if (current == executable && request != iconsRequested_.end() && request->second == ticket)
                         data_->icons[id] = pixels;
                 },
                 id);

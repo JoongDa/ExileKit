@@ -1,4 +1,6 @@
 #include "renderer.h"
+#include <algorithm>
+#include <cmath>
 
 namespace poetoolbox::ui {
 HRESULT Renderer::Initialize() {
@@ -122,7 +124,14 @@ bool Renderer::Image(const std::shared_ptr<const IconPixels> &source, D2D1_RECT_
             return false;
         found = images_.emplace(&pixels, CachedImage{source, std::move(bitmap)}).first;
     }
-    target_->DrawBitmap(found->second.bitmap.Get(), rect);
+    float dpiX = 96, dpiY = 96;
+    target_->GetDpi(&dpiX, &dpiY);
+    const float factor = std::min({1.0f, (rect.right - rect.left) * dpiX / (96 * pixels.width),
+                                   (rect.bottom - rect.top) * dpiY / (96 * pixels.height)});
+    const float width = pixels.width * factor * 96 / dpiX, height = pixels.height * factor * 96 / dpiY;
+    const float left = std::round((rect.left + rect.right - width) * 0.5f * dpiX / 96) * 96 / dpiX;
+    const float top = std::round((rect.top + rect.bottom - height) * 0.5f * dpiY / 96) * 96 / dpiY;
+    target_->DrawBitmap(found->second.bitmap.Get(), D2D1::RectF(left, top, left + width, top + height));
     return true;
 }
 HRESULT Renderer::BeginOffscreen(UINT width, UINT height, float dpi) {

@@ -33,6 +33,7 @@ class WinHttpClient final : public HttpClient {
 };
 struct WebMetadata {
     std::string title;
+    std::string svgIcon; // Recognized vector source, retained even when using a raster fallback.
     std::optional<IconPixels> icon;
 };
 // Invoke on the dedicated networking worker after first paint. COM must be initialized there.
@@ -42,7 +43,7 @@ class WebMetadataProvider final {
     explicit WebMetadataProvider(std::filesystem::path cache, HttpClient *client = nullptr)
         : cache_(std::move(cache)), client_(client ? client : &system_) {}
     [[nodiscard]] Result<WebMetadata> Fetch(std::string_view toolId, std::string_view url, bool needTitle,
-                                            std::stop_token stop = {});
+                                            std::stop_token stop = {}, uint32_t targetPx = 64);
 
   private:
     std::filesystem::path cache_;

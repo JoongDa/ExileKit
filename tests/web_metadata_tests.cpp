@@ -40,7 +40,7 @@ int wmain(int argc, wchar_t **argv) {
         const auto output = std::filesystem::absolute(argv[2]) / (L"run-" + std::to_wstring(GetCurrentProcessId()) +
                                                                   L"-" + std::to_wstring(GetTickCount64()));
         std::filesystem::create_directories(output);
-        std::ifstream file(source / L"resources/icons/generic-web.png", std::ios::binary);
+        std::ifstream file(source / L"assets/branding/exilekit-source.png", std::ios::binary);
         std::vector<uint8_t> png((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         Check(!png.empty() && IconProvider::DecodeBytes(png).has_value(), "Fixture decode failed");
         const HttpResponse image{200, {}, "image/png", png};
@@ -70,7 +70,56 @@ int wmain(int argc, wchar_t **argv) {
         fallback.replies["https://fallback.example/favicon.ico"] = image;
         WebMetadataProvider fallbackProvider(output / L"fallback", &fallback);
         auto direct = fallbackProvider.Fetch("fallback", "https://fallback.example/path", false);
-        Check(direct && direct->icon && fallback.calls.size() == 1, "Default favicon path should avoid HTML request");
+        Check(direct && direct->icon && fallback.calls.size() == 2, "HTML discovery must precede fallback favicon");
+
+        FakeHttp ranked;
+        ranked.replies["https://rank.example/"] =
+            Html("<link rel='icon' sizes='16x16' href='/tiny.ico'>"
+                 "<link rel='icon' type='image/svg+xml' sizes='any' href='/vector.svg'>"
+                 "<link rel='apple-touch-icon' sizes='180x180' href='/apple.png'>"
+                 "<link rel='icon' type='image/png' sizes='256x256' href='/large.png'>");
+        ranked.replies["https://rank.example/large.png"] = image;
+        auto best = WebMetadataProvider(output / L"rank", &ranked).Fetch("rank", "https://rank.example/", false);
+        Check(best && best->icon && best->svgIcon == "https://rank.example/vector.svg" && ranked.calls.size() == 2 &&
+                  ranked.calls.back().url == "https://rank.example/large.png",
+              "High-resolution PNG did not outrank tiny favicon or SVG metadata was lost");
+        auto bestCached = WebMetadataProvider(output / L"rank", &ranked).Fetch("rank", "https://rank.example/", false);
+        Check(bestCached && bestCached->svgIcon == best->svgIcon && ranked.calls.size() == 2,
+              "SVG metadata or positive source cache was not reused");
+
+        FakeHttp vectorOnly;
+        vectorOnly.replies["https://svg.example/"] = Html("<link rel='icon' type='image/svg+xml' href='/only.svg'>");
+        auto vectorFallback =
+            WebMetadataProvider(output / L"vector", &vectorOnly).Fetch("vector", "https://svg.example/", false);
+        Check(vectorFallback && !vectorFallback->icon && vectorFallback->svgIcon == "https://svg.example/only.svg",
+              "SVG-only site lost its metadata instead of using the generic raster fallback");
+        auto vectorCached =
+            WebMetadataProvider(output / L"vector", &vectorOnly).Fetch("vector", "https://svg.example/", false);
+        Check(vectorCached && vectorCached->svgIcon == vectorFallback->svgIcon && vectorOnly.calls.size() == 2,
+              "SVG-only metadata was not cached");
+
+        FakeHttp manifest;
+        manifest.replies["https://manifest.example/"] = Html("<link rel='manifest' href='/app/site.webmanifest'>");
+        const std::string manifestJson = R"({"icons":[{"src":"big.png","sizes":"512x512","type":"image/png"}]})";
+        manifest.replies["https://manifest.example/app/site.webmanifest"] = {
+            200, {}, "application/manifest+json", {manifestJson.begin(), manifestJson.end()}};
+        manifest.replies["https://manifest.example/app/big.png"] = image;
+        auto manifestIcon =
+            WebMetadataProvider(output / L"manifest", &manifest).Fetch("manifest", "https://manifest.example/", false);
+        Check(manifestIcon && manifestIcon->icon && manifest.calls.size() == 3 &&
+                  manifest.calls.back().url == "https://manifest.example/app/big.png",
+              "Manifest icon URL or discovery failed");
+
+        // Existing source bytes are still readable, but get one asynchronous quality discovery.
+        std::filesystem::create_directories(output / L"upgrade");
+        {
+            std::ofstream legacy(output / L"upgrade/rank.icon", std::ios::binary);
+            legacy.write(reinterpret_cast<const char *>(png.data()), png.size());
+        }
+        const auto oldCalls = ranked.calls.size();
+        auto upgraded = WebMetadataProvider(output / L"upgrade", &ranked).Fetch("rank", "https://rank.example/", false);
+        Check(upgraded && upgraded->icon && ranked.calls.size() == oldCalls + 2,
+              "Legacy cache prevented high-resolution discovery");
 
         FakeHttp upper;
         upper.replies["https://upper.example/"] = Html("<link rel='icon' href='HTTPS://cdn.example/icon.png'>");
@@ -116,7 +165,7 @@ int wmain(int argc, wchar_t **argv) {
         relocated.replies["https://new.example/home"] = Html("<title>New home</title>");
         relocated.replies["https://new.example/favicon.ico"] = image;
         auto moved = WebMetadataProvider(output / L"moved", &relocated).Fetch("moved", "https://old.example/", false);
-        Check(moved && moved->icon && relocated.calls.size() == 4 &&
+        Check(moved && moved->icon && relocated.calls.size() == 3 &&
                   relocated.calls.back().url == "https://new.example/favicon.ico",
               "Redirected website used the original origin for its fallback icon");
         FakeHttp loop;

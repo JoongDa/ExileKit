@@ -159,6 +159,8 @@ LRESULT MainWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
     case WM_DPICHANGED: {
         dpi_ = static_cast<float>(HIWORD(wparam));
         renderer_.SetDpi(dpi_);
+        services_.SetIconMetrics(ToolIconDip, dpi_);
+        page_.Refresh();
         UpdateWindowIcons();
         UpdateSearchFont();
         const auto *rect = reinterpret_cast<RECT *>(lparam);

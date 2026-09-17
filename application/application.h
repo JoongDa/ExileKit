@@ -58,6 +58,7 @@ class ApplicationServices final {
     void Launch(std::string id, bool riskAccepted);
     void OpenDownloadPage(std::string id);
     void RequestIcon(std::string id, bool allowRemote = false);
+    void SetIconMetrics(float dip, float dpi);
     void ReportError(Error error);
 
   private:
@@ -79,7 +80,11 @@ class ApplicationServices final {
     std::uint64_t configRevision_ = 0;
     std::optional<Error> error_;
     std::string statusKey_ = "status.loading";
-    std::set<std::string, std::less<>> iconsRequested_;
+    // One active display size per window, shared across Home / POE / POE2.
+    // Source changes invalidate the ticket; DPI changes invalidate the entire size generation.
+    std::map<std::string, uint64_t, std::less<>> iconsRequested_;
+    uint64_t nextIconTicket_ = 0;
+    uint32_t iconTargetPx_ = 64;
     std::set<std::string, std::less<>> remoteRequested_;
     std::mutex networkMutex_;
     std::condition_variable networkCondition_;

@@ -2,6 +2,8 @@
 #include "icon_provider.h"
 #include "poetoolbox/tool.h"
 #include "utf.h"
+#include "json_internal.h"
+#include <sstream>
 #include <windows.h>
 #include <winhttp.h>
 #include <algorithm>
@@ -321,9 +323,38 @@ Attributes ParseAttributes(std::string_view tag) {
     }
     return attributes;
 }
+struct IconCandidate {
+    std::string url, type, sizes;
+    int priority = 4;
+    unsigned size = 0;
+    bool svg = false;
+};
+IconCandidate Candidate(std::string url, std::string type, std::string sizes, int priority) {
+    IconCandidate result{std::move(url), Lower(type), Lower(sizes), priority};
+    const auto path = Lower(result.url.substr(0, result.url.find_first_of("?#")));
+    result.svg = result.type == "image/svg+xml" || path.ends_with(".svg");
+    std::istringstream tokens(result.sizes);
+    std::string token;
+    while (tokens >> token) {
+        unsigned w = 0, h = 0;
+        const auto x = token.find('x');
+        if (x == std::string::npos)
+            continue;
+        auto a = std::from_chars(token.data(), token.data() + x, w);
+        auto b = std::from_chars(token.data() + x + 1, token.data() + token.size(), h);
+        if (a.ec == std::errc{} && a.ptr == token.data() + x && b.ec == std::errc{} &&
+            b.ptr == token.data() + token.size() && w <= 4096 && h <= 4096)
+            result.size = std::max(result.size, std::min(w, h));
+    }
+    if (result.svg)
+        result.priority = 0;
+    else if (priority == 4 && (result.type == "image/png" || path.ends_with(".png")))
+        result.priority = 1;
+    return result;
+}
 struct HtmlMetadata {
-    std::string title;
-    std::string icon;
+    std::string title, manifest;
+    std::vector<IconCandidate> icons;
 };
 HtmlMetadata ParseHtml(std::span<const uint8_t> bytes, std::string_view url) {
     HtmlMetadata metadata;
@@ -375,10 +406,21 @@ HtmlMetadata ParseHtml(std::span<const uint8_t> bytes, std::string_view url) {
             if (name == "meta" &&
                 (Lower(get("property")) == "og:site_name" || Lower(get("name")) == "application-name"))
                 siteName = CleanTitle(get("content"));
-            if (name == "link" && metadata.icon.empty()) {
-                const auto rel = " " + Lower(get("rel")) + " ";
-                if (rel.find(" icon ") != std::string::npos || rel.find(" apple-touch-icon ") != std::string::npos)
-                    metadata.icon = Resolve(url, get("href"));
+            if (name == "link") {
+                auto rel = Lower(get("rel"));
+                for (auto &c : rel)
+                    if (Space(c))
+                        c = ' ';
+                rel = " " + rel + " ";
+                const auto href = Resolve(url, get("href"));
+                if (href.empty())
+                    continue;
+                if (rel.find(" manifest ") != std::string::npos && metadata.manifest.empty())
+                    metadata.manifest = href;
+                const bool apple = rel.find(" apple-touch-icon ") != std::string::npos ||
+                                   rel.find(" apple-touch-icon-precomposed ") != std::string::npos;
+                if ((rel.find(" icon ") != std::string::npos || apple) && metadata.icons.size() < 32)
+                    metadata.icons.push_back(Candidate(href, get("type"), get("sizes"), apple ? 2 : 4));
             }
         }
     }
@@ -521,41 +563,62 @@ Result<HttpResponse> WinHttpClient::Get(const HttpRequest &request) {
 }
 
 Result<WebMetadata> WebMetadataProvider::Fetch(std::string_view toolId, std::string_view url, bool needTitle,
-                                               std::stop_token stop) {
+                                               std::stop_token stop, uint32_t targetPx) {
     if (!IsValidToolId(toolId) || !IsSafeWebUrl(url))
         return std::unexpected(Error{ErrorCode::InvalidURL, "Invalid website metadata key or HTTPS URL."});
     const auto deadline = Clock::now() + std::chrono::seconds(6);
     if (stop.stop_requested())
         return std::unexpected(Error{ErrorCode::Cancelled, "Website metadata request cancelled."});
     WebMetadata metadata;
-    for (const auto *extension : {L".png", L".ico", L".icon"}) {
-        auto cached = IconProvider::DecodeFile(cache_ / (Utf16(toolId) + extension));
+    for (const auto *extension : {L".icon", L".png", L".ico"}) {
+        auto cached = IconProvider::DecodeFile(cache_ / (Utf16(toolId) + extension), targetPx);
         if (cached) {
             metadata.icon = std::move(*cached);
             break;
         }
     }
     const auto failed = cache_ / (Utf16(toolId) + L".failed");
-    const bool suppressIcon = metadata.icon.has_value() || FailureCached(failed);
+    const auto qualityFile = cache_ / (Utf16(toolId) + L".quality-v1.json");
+    bool qualityCached = false;
+    // Original source bytes remain reusable at every DPI; old caches get one bounded upgrade attempt.
+    std::error_code qualityError;
+    const auto qualitySize = std::filesystem::file_size(qualityFile, qualityError);
+    if (!qualityError && qualitySize < 16384) {
+        std::ifstream file(qualityFile);
+        try {
+            const std::string text((std::istreambuf_iterator<char>(file)), {});
+            const auto quality = detail::ParseJson(text, ErrorCode::IoError);
+            qualityCached = quality.value("url", "") == url;
+            if (qualityCached)
+                metadata.svgIcon = quality.value("svg", "");
+        } catch (const std::exception &) {
+        } catch (const Error &) {
+        }
+    }
+    const bool suppressIcon = (metadata.icon.has_value() && qualityCached) || FailureCached(failed);
     if (!needTitle && suppressIcon)
         return metadata;
     Error lastError = NetworkError("Website metadata unavailable; use the shortcut fallback.");
+    std::optional<Resource> selected;
     const auto saveIcon = [&](const Resource &resource) -> bool {
-        auto icon = IconProvider::DecodeBytes(resource.response.body);
+        auto icon = IconProvider::DecodeBytes(resource.response.body, targetPx);
         if (!icon) {
             lastError = icon.error();
             return false;
         }
-        metadata.icon = std::move(*icon);
-        // A read-only/unavailable cache must not discard a valid in-memory icon.
-        (void)CacheBytes(cache_ / (Utf16(toolId) + L".icon"), resource.response.body);
-        std::error_code ec;
-        std::filesystem::remove(failed, ec);
-        return true;
+        if (!metadata.icon || std::min(icon->sourceWidth, icon->sourceHeight) >=
+                                  std::min(metadata.icon->sourceWidth, metadata.icon->sourceHeight)) {
+            metadata.icon = std::move(*icon);
+            metadata.icon->source = resource.url;
+            selected = resource;
+        }
+        return metadata.icon && std::min(metadata.icon->sourceWidth, metadata.icon->sourceHeight) >=
+                                    IconProvider::SourcePixels(targetPx);
     };
     std::vector<std::string> attemptedIcons;
     const auto fetchIcon = [&](const std::string &iconUrl) -> bool {
-        if (std::find(attemptedIcons.begin(), attemptedIcons.end(), iconUrl) != attemptedIcons.end())
+        if (attemptedIcons.size() >= 8 ||
+            std::find(attemptedIcons.begin(), attemptedIcons.end(), iconUrl) != attemptedIcons.end())
             return false;
         attemptedIcons.push_back(iconUrl);
         auto response = Download(*client_, iconUrl, IconLimit, deadline, stop);
@@ -566,10 +629,6 @@ Result<WebMetadata> WebMetadataProvider::Fetch(std::string_view toolId, std::str
         return saveIcon(*response);
     };
     std::string fallback = Origin(url) + "/favicon.ico";
-    if (!needTitle && !suppressIcon) {
-        if (fetchIcon(fallback))
-            return metadata;
-    }
     auto html = Download(*client_, std::string(url), HtmlLimit, deadline, stop);
     if (html) {
         fallback = Origin(html->url) + "/favicon.ico";
@@ -578,21 +637,99 @@ Result<WebMetadata> WebMetadataProvider::Fetch(std::string_view toolId, std::str
             auto parsed = ParseHtml(html->response.body, html->url);
             if (needTitle)
                 metadata.title = std::move(parsed.title);
-            if (!suppressIcon && !parsed.icon.empty())
-                fetchIcon(parsed.icon);
+            if (!suppressIcon) {
+                const auto rank = [targetPx](const auto &a, const auto &b) {
+                    const bool smallA = a.size && a.size < targetPx, smallB = b.size && b.size < targetPx;
+                    if (smallA != smallB)
+                        return !smallA;
+                    if (a.priority != b.priority)
+                        return a.priority < b.priority;
+                    return a.size > b.size;
+                };
+                std::stable_sort(parsed.icons.begin(), parsed.icons.end(), rank);
+                bool satisfied = false;
+                for (const auto &candidate : parsed.icons) {
+                    if (candidate.svg) {
+                        if (metadata.svgIcon.empty())
+                            metadata.svgIcon = candidate.url;
+                        continue;
+                    }
+                    // Try high-quality HTML sources before spending the deadline on a manifest.
+                    if (candidate.priority < 3 && (!candidate.size || candidate.size >= targetPx) &&
+                        attemptedIcons.size() < 7 && fetchIcon(candidate.url)) {
+                        satisfied = true;
+                        break;
+                    }
+                }
+                if (!satisfied && !parsed.manifest.empty()) {
+                    auto manifest = Download(*client_, parsed.manifest, HtmlLimit, deadline, stop);
+                    if (manifest)
+                        try {
+                            const std::string text(manifest->response.body.begin(), manifest->response.body.end());
+                            const auto json = detail::ParseJson(text, ErrorCode::IoError);
+                            if (json.contains("icons") && json["icons"].is_array())
+                                for (const auto &entry : json["icons"]) {
+                                    if (parsed.icons.size() >= 48)
+                                        break;
+                                    if (!entry.is_object() || !entry.contains("src") || !entry["src"].is_string())
+                                        continue;
+                                    const auto href = Resolve(manifest->url, entry["src"].get<std::string>());
+                                    if (!href.empty())
+                                        parsed.icons.push_back(
+                                            Candidate(href, entry.value("type", ""), entry.value("sizes", ""), 3));
+                                }
+                        } catch (const std::exception &) { /* Try HTML icons and favicon. */
+                        } catch (const Error &) {          /* Bounded JSON parser rejected the manifest. */
+                        }
+                }
+                std::stable_sort(parsed.icons.begin(), parsed.icons.end(), rank);
+                for (const auto &candidate : parsed.icons) {
+                    // WIC has no built-in SVG decoder. Retain its URL as metadata; use raster fallback.
+                    if (candidate.svg) {
+                        if (metadata.svgIcon.empty())
+                            metadata.svgIcon = candidate.url;
+                        continue;
+                    }
+                    if (satisfied || attemptedIcons.size() >= 7)
+                        break; // Reserve a request for favicon.ico.
+                    if (fetchIcon(candidate.url)) {
+                        satisfied = true;
+                        break;
+                    }
+                }
+            }
         }
     } else {
         lastError = html.error();
     }
-    if (!suppressIcon && !metadata.icon)
+    if (!suppressIcon && (!metadata.icon || std::min(metadata.icon->sourceWidth, metadata.icon->sourceHeight) <
+                                                IconProvider::SourcePixels(targetPx)))
         fetchIcon(fallback);
     if (stop.stop_requested())
         return std::unexpected(Error{ErrorCode::Cancelled, "Website metadata request cancelled."});
-    if (!suppressIcon && !metadata.icon) {
+    if (selected) {
+        // Keep original encoded bytes, never the display-size bitmap, in the disk cache.
+        if (CacheBytes(cache_ / (Utf16(toolId) + L".icon"), selected->response.body)) {
+            const auto quality = nlohmann::json{{"url", url},
+                                                {"selected", selected->url},
+                                                {"svg", metadata.svgIcon},
+                                                {"width", metadata.icon->sourceWidth},
+                                                {"height", metadata.icon->sourceHeight}}
+                                     .dump();
+            (void)CacheBytes(qualityFile, {reinterpret_cast<const uint8_t *>(quality.data()), quality.size()});
+        }
+        std::error_code ec;
+        std::filesystem::remove(failed, ec);
+    } else if (!suppressIcon) {
+        if (!metadata.svgIcon.empty()) {
+            const auto vectorMetadata = nlohmann::json{{"url", url}, {"svg", metadata.svgIcon}}.dump();
+            (void)CacheBytes(qualityFile,
+                             {reinterpret_cast<const uint8_t *>(vectorMetadata.data()), vectorMetadata.size()});
+        }
         constexpr std::array<uint8_t, 1> marker{'1'};
         (void)CacheBytes(failed, marker);
     }
-    if (metadata.title.empty() && !metadata.icon)
+    if (metadata.title.empty() && !metadata.icon && metadata.svgIcon.empty())
         return std::unexpected(std::move(lastError));
     return metadata;
 }
