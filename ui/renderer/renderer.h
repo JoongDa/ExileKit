@@ -22,6 +22,7 @@ class Renderer final {
     void SetDpi(float dpi);
     void Fill(D2D1_RECT_F rect, UINT32 color, float radius = 0);
     void Text(std::wstring_view text, D2D1_RECT_F rect, UINT32 color, bool heading = false);
+    void IconLabel(std::wstring_view text, D2D1_RECT_F rect, UINT32 color, bool monogram = false);
     void PushClip(D2D1_RECT_F rect);
     void PopClip();
     bool Image(const std::shared_ptr<const IconPixels> &pixels, D2D1_RECT_F rect);
@@ -32,6 +33,8 @@ class Renderer final {
     Microsoft::WRL::ComPtr<IDWriteFactory> write_;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> body_;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> heading_;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> iconLabel_;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> monogram_;
     Microsoft::WRL::ComPtr<ID2D1RenderTarget> target_;
     Microsoft::WRL::ComPtr<ID2D1HwndRenderTarget> windowTarget_;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brush_;

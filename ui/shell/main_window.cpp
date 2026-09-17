@@ -57,10 +57,13 @@ int MainWindow::Run(HINSTANCE instance, int show, UINT iconResource) {
             continue;
         }
         if (message.message == WM_KEYDOWN && message.wParam == VK_TAB) {
-            if (GetFocus() == search_ && IsWindowVisible(add_))
-                SetFocus(add_);
-            else
-                SetFocus(GetFocus() == search_ || GetFocus() == add_ ? window_ : search_);
+            SetFocus(GetFocus() == search_ || page_.Settings() ? window_ : search_);
+            continue;
+        }
+        if (message.message == WM_KEYDOWN && message.wParam == 'N' && (GetKeyState(VK_CONTROL) & 0x8000) &&
+            page_.View() == LibraryView::Home) {
+            userEngaged_ = true;
+            HandleAction({PageActionKind::AddShortcut, {}});
             continue;
         }
         TranslateMessage(&message);
@@ -100,20 +103,18 @@ LRESULT MainWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
         SetWindowTextW(search_, L"");
         if (!SetWindowSubclass(search_, SearchProc, 1, reinterpret_cast<DWORD_PTR>(this)))
             return -1;
-        add_ = CreateWindowExW(0, L"BUTTON", L"+", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 0, 0,
-                               window_, reinterpret_cast<HMENU>(1002), GetModuleHandleW(nullptr), nullptr);
-        if (!add_)
-            return -1;
-        tooltip_ = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr, WS_POPUP | TTS_ALWAYSTIP, CW_USEDEFAULT,
-                                   CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, window_, nullptr,
-                                   GetModuleHandleW(nullptr), nullptr);
+        tooltip_ = CreateWindowExW(WS_EX_TOPMOST | WS_EX_NOACTIVATE, TOOLTIPS_CLASSW, nullptr,
+                                   WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+                                   CW_USEDEFAULT, window_, nullptr, GetModuleHandleW(nullptr), nullptr);
         if (tooltip_) {
             TOOLINFOW tip{sizeof(tip)};
-            tip.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
             tip.hwnd = window_;
-            tip.uId = reinterpret_cast<UINT_PTR>(add_);
-            tip.lpszText = const_cast<wchar_t *>(L"+");
+            tip.uId = 1;
+            tip.lpszText = const_cast<wchar_t *>(L"");
             SendMessageW(tooltip_, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&tip));
+            SendMessageW(tooltip_, TTM_SETMAXTIPWIDTH, 0, static_cast<LPARAM>(320 * dpi_ / 96));
+            SendMessageW(tooltip_, TTM_SETDELAYTIME, TTDT_INITIAL, 500);
+            SendMessageW(tooltip_, TTM_SETDELAYTIME, TTDT_AUTOPOP, 10000);
         }
         page_.Refresh();
         UpdateSearchFont();
@@ -138,14 +139,10 @@ LRESULT MainWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
             GetWindowTextW(search_, text.data(), length + 1);
             text.resize(length);
             page_.SetSearch(Utf8(text));
+            HideToolTooltip();
             UpdateScrollBar();
             RequestVisibleIcons();
             InvalidateRect(window_, nullptr, FALSE);
-            return 0;
-        }
-        if (LOWORD(wparam) == 1002 && HIWORD(wparam) == BN_CLICKED) {
-            userEngaged_ = true;
-            HandleAction({PageActionKind::AddShortcut, {}});
             return 0;
         }
         break;
@@ -181,21 +178,31 @@ LRESULT MainWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
             TRACKMOUSEEVENT event{sizeof(event), TME_LEAVE, window_, 0};
             trackingMouse_ = TrackMouseEvent(&event) != FALSE;
         }
-        if (page_.MouseMove(D2D1::Point2F(GET_X_LPARAM(lparam) * 96 / dpi_, GET_Y_LPARAM(lparam) * 96 / dpi_)))
+        const auto point = D2D1::Point2F(GET_X_LPARAM(lparam) * 96 / dpi_, GET_Y_LPARAM(lparam) * 96 / dpi_);
+        if (page_.MouseMove(point))
             InvalidateRect(window_, nullptr, FALSE);
+        UpdateToolTooltip(point);
+        if (tooltip_) {
+            MSG relay{window_, message, wparam, lparam, static_cast<DWORD>(GetMessageTime())};
+            GetCursorPos(&relay.pt);
+            SendMessageW(tooltip_, TTM_RELAYEVENT, 0, reinterpret_cast<LPARAM>(&relay));
+        }
         return 0;
     }
     case WM_MOUSELEAVE:
+        HideToolTooltip();
         trackingMouse_ = false;
         if (page_.MouseMove(D2D1::Point2F(-1, -1)))
             InvalidateRect(window_, nullptr, FALSE);
         return 0;
     case WM_LBUTTONDOWN:
+        HideToolTooltip();
         userEngaged_ = true;
         SetFocus(window_);
         HandleAction(page_.Click(D2D1::Point2F(GET_X_LPARAM(lparam) * 96 / dpi_, GET_Y_LPARAM(lparam) * 96 / dpi_)));
         return 0;
     case WM_CONTEXTMENU: {
+        HideToolTooltip();
         POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
         if (point.x == -1 && point.y == -1) {
             point = {static_cast<LONG>((LibraryPage::sidebar + 50) * dpi_ / 96), static_cast<LONG>(165 * dpi_ / 96)};
@@ -212,6 +219,7 @@ LRESULT MainWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
         break;
     }
     case WM_MOUSEWHEEL: {
+        HideToolTooltip();
         userEngaged_ = true;
         UINT lines = 3;
         SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, &lines, 0);
@@ -224,6 +232,7 @@ LRESULT MainWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
         return 0;
     }
     case WM_VSCROLL: {
+        HideToolTooltip();
         SCROLLINFO info{sizeof(info), SIF_TRACKPOS};
         GetScrollInfo(window_, SB_VERT, &info);
         float offset = page_.ScrollOffset();
@@ -277,6 +286,10 @@ LRESULT MainWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
             return 0;
         }
         break;
+    case WM_ACTIVATE:
+        if (LOWORD(wparam) == WA_INACTIVE)
+            HideToolTooltip();
+        break;
     case WM_GETMINMAXINFO: {
         auto *info = reinterpret_cast<MINMAXINFO *>(lparam);
         const auto dpi = GetDpiForWindow(window_);
@@ -321,19 +334,16 @@ void MainWindow::Paint() {
         logger_.Write(LogLevel::Error, L"Rendering failed.");
 }
 void MainWindow::Layout() {
+    HideToolTooltip();
     RECT rect{};
     GetClientRect(window_, &rect);
     const float scale = dpi_ / 96;
     page_.Resize(static_cast<float>(rect.right) / scale, static_cast<float>(rect.bottom) / scale);
     const int x = static_cast<int>((LibraryPage::sidebar + 24) * scale);
     MoveWindow(search_, x, static_cast<int>(20 * scale),
-               std::max(40, static_cast<int>(rect.right) - x -
-                                static_cast<int>(page_.View() == LibraryView::Home ? 90 * scale : 24 * scale)),
+               std::max(40, static_cast<int>(rect.right) - x - static_cast<int>(24 * scale)),
                static_cast<int>(28 * scale), TRUE);
-    MoveWindow(add_, static_cast<int>(rect.right - 64 * scale), static_cast<int>(16 * scale),
-               static_cast<int>(40 * scale), static_cast<int>(34 * scale), TRUE);
     ShowWindow(search_, page_.Settings() ? SW_HIDE : SW_SHOWNA);
-    ShowWindow(add_, page_.View() == LibraryView::Home ? SW_SHOWNA : SW_HIDE);
     UpdateScrollBar();
     RequestVisibleIcons();
 }
@@ -379,7 +389,6 @@ void MainWindow::UpdateSearchFont() {
         return;
     }
     SendMessageW(search_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
-    SendMessageW(add_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
     if (searchFont_)
         DeleteObject(searchFont_);
     searchFont_ = font;

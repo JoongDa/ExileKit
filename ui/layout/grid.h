@@ -4,17 +4,18 @@
 #include <cstddef>
 
 namespace poetoolbox::ui {
-struct Grid final {
-    static constexpr float gap = 16;
-    static constexpr float cardHeight = 148;
+struct ToolIconGrid final {
+    static constexpr float gap = 20;
+    static constexpr float itemHeight = 136;
+    static constexpr float minWidth = 120;
     int columns;
-    float cardWidth;
-    explicit Grid(float width)
-        : columns(std::max(1, static_cast<int>((width + gap) / (260 + gap)))),
-          cardWidth(std::max(0.0f, (width - gap * (columns - 1)) / columns)) {}
+    float itemWidth;
+    explicit ToolIconGrid(float width)
+        : columns(std::max(1, static_cast<int>((width + gap) / (minWidth + gap)))),
+          itemWidth(std::max(0.0f, (width - gap * (columns - 1)) / columns)) {}
     [[nodiscard]] float Height(size_t count) const {
         const auto rows = (count + static_cast<size_t>(columns) - 1) / static_cast<size_t>(columns);
-        return rows ? static_cast<float>(rows) * (cardHeight + gap) - gap : 0;
+        return rows ? static_cast<float>(rows) * (itemHeight + gap) - gap : 0;
     }
 };
 class ScrollState final {

@@ -15,13 +15,16 @@ int main() {
     for (const float dpi : {96.0f, 120.0f, 144.0f, 168.0f, 192.0f}) {
         for (const float pixels : {720.0f, 1080.0f, 1440.0f, 1920.0f, 2560.0f, 3840.0f}) {
             const float width = std::max(1.0f, pixels * 96 / dpi - 268);
-            const Grid grid(width);
-            check(grid.columns >= 1 && grid.cardWidth > 0, "Grid must have a usable column");
-            check(grid.cardWidth * grid.columns + Grid::gap * (grid.columns - 1) <= width + 0.01f,
-                  "Cards overflow viewport");
-            check(grid.columns == 1 || grid.cardWidth >= 260, "Multi-column cards fall below minimum width");
-            check(grid.Height(0) == 0 && grid.Height(1) == Grid::cardHeight, "Empty/single row extent incorrect");
-            check(grid.Height(static_cast<size_t>(grid.columns) + 1) == 2 * Grid::cardHeight + Grid::gap,
+            const ToolIconGrid grid(width);
+            check(grid.columns >= 1 && grid.itemWidth > 0, "ToolIconGrid must have a usable column");
+            check(grid.itemWidth * grid.columns + ToolIconGrid::gap * (grid.columns - 1) <= width + 0.01f,
+                  "Items overflow viewport");
+            check(grid.columns == 1 || grid.itemWidth >= ToolIconGrid::minWidth,
+                  "Multi-column items fall below minimum width");
+            check(grid.Height(0) == 0 && grid.Height(1) == ToolIconGrid::itemHeight,
+                  "Empty/single row extent incorrect");
+            check(grid.Height(static_cast<size_t>(grid.columns) + 1) ==
+                      2 * ToolIconGrid::itemHeight + ToolIconGrid::gap,
                   "Wrapped row extent incorrect");
         }
     }

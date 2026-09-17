@@ -1,6 +1,6 @@
 #pragma once
 #include "application.h"
-#include "controls/tool_card.h"
+#include "controls/tool_icon_item.h"
 #include "layout/grid.h"
 namespace poetoolbox::ui {
 enum class PageActionKind {
@@ -30,6 +30,10 @@ struct PageAction {
     std::string id;
 };
 enum class LibraryView { Home, POE, POE2, Settings };
+struct ToolTooltip {
+    std::wstring text;
+    D2D1_RECT_F rect;
+};
 class LibraryPage final {
   public:
     explicit LibraryPage(ApplicationServices &services) : services_(services) {}
@@ -41,6 +45,7 @@ class LibraryPage final {
     bool MouseMove(D2D1_POINT_2F point);
     PageAction Click(D2D1_POINT_2F point);
     [[nodiscard]] std::string ContextTool(D2D1_POINT_2F point) const;
+    [[nodiscard]] std::optional<ToolTooltip> Tooltip(D2D1_POINT_2F point) const;
     bool Scroll(float delta);
     bool ScrollTo(float offset);
     void UpdateIcon(std::string_view id);
@@ -56,20 +61,20 @@ class LibraryPage final {
     static constexpr float sidebar = 220, top = 64, footer = 36;
 
   private:
-    struct CardPlacement {
+    struct ItemPlacement {
         size_t model;
         D2D1_RECT_F rect;
     };
     void Layout();
-    [[nodiscard]] int HitCard(D2D1_POINT_2F point) const;
+    [[nodiscard]] int HitItem(D2D1_POINT_2F point) const;
     [[nodiscard]] std::wstring T(std::string_view key) const;
     ApplicationServices &services_;
-    std::vector<ToolCardModel> models_;
-    std::vector<CardPlacement> cards_;
+    std::vector<ToolIconModel> models_;
+    std::vector<ItemPlacement> items_;
     ScrollState scroll_;
     LibraryView view_ = LibraryView::Home;
     float width_ = 1200, height_ = 800;
-    int hoverNav_ = -1, hoverCard_ = -1;
+    int hoverNav_ = -1, hoverItem_ = -1;
     std::string query_;
     bool homeEmpty_ = true;
 };

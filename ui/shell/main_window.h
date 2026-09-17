@@ -19,6 +19,8 @@ class MainWindow final {
     void UpdateSearchFont();
     void UpdateWindowIcons();
     void ReleaseWindowIcons();
+    void UpdateToolTooltip(D2D1_POINT_2F point);
+    void HideToolTooltip();
     void RefreshContent(bool resetScroll = false);
     void RequestVisibleIcons();
     void HandleAction(PageAction action);
@@ -36,9 +38,9 @@ class MainWindow final {
     ApplicationServices &services_;
     LibraryPage page_;
     HWND search_ = nullptr;
-    HWND add_ = nullptr;
     HWND tooltip_ = nullptr;
-    std::wstring addTooltip_;
+    std::wstring toolTooltip_;
+    RECT tooltipRect_{};
     HFONT searchFont_ = nullptr;
     HBRUSH searchBrush_ = nullptr;
     bool trackingMouse_ = false;

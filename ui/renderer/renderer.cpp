@@ -13,8 +13,28 @@ HRESULT Renderer::Initialize() {
                                   DWRITE_FONT_STRETCH_NORMAL, 14, L"en-us", body_.GetAddressOf());
     if (FAILED(hr))
         return hr;
-    return write_->CreateTextFormat(L"Segoe UI", nullptr, DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_FONT_STYLE_NORMAL,
-                                    DWRITE_FONT_STRETCH_NORMAL, 22, L"en-us", heading_.GetAddressOf());
+    hr = write_->CreateTextFormat(L"Segoe UI", nullptr, DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_FONT_STYLE_NORMAL,
+                                  DWRITE_FONT_STRETCH_NORMAL, 22, L"en-us", heading_.GetAddressOf());
+    if (FAILED(hr))
+        return hr;
+    hr = write_->CreateTextFormat(L"Segoe UI", nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+                                  DWRITE_FONT_STRETCH_NORMAL, 14, L"en-us", iconLabel_.GetAddressOf());
+    if (FAILED(hr))
+        return hr;
+    iconLabel_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+    Microsoft::WRL::ComPtr<IDWriteInlineObject> ellipsis;
+    hr = write_->CreateEllipsisTrimmingSign(iconLabel_.Get(), &ellipsis);
+    if (FAILED(hr))
+        return hr;
+    const DWRITE_TRIMMING trimming{DWRITE_TRIMMING_GRANULARITY_CHARACTER, 0, 0};
+    iconLabel_->SetTrimming(&trimming, ellipsis.Get());
+    hr = write_->CreateTextFormat(L"Segoe UI", nullptr, DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_FONT_STYLE_NORMAL,
+                                  DWRITE_FONT_STRETCH_NORMAL, 28, L"en-us", monogram_.GetAddressOf());
+    if (SUCCEEDED(hr)) {
+        monogram_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+        monogram_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+    }
+    return hr;
 }
 HRESULT Renderer::Begin(HWND window, float dpi) {
     if (!target_) {
@@ -75,6 +95,11 @@ void Renderer::Text(std::wstring_view text, D2D1_RECT_F rect, UINT32 color, bool
 }
 void Renderer::PushClip(D2D1_RECT_F rect) {
     target_->PushAxisAlignedClip(rect, D2D1_ANTIALIAS_MODE_ALIASED);
+}
+void Renderer::IconLabel(std::wstring_view text, D2D1_RECT_F rect, UINT32 color, bool monogram) {
+    brush_->SetColor(D2D1::ColorF(color));
+    target_->DrawText(text.data(), static_cast<UINT32>(text.size()), monogram ? monogram_.Get() : iconLabel_.Get(),
+                      rect, brush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
 }
 void Renderer::PopClip() {
     target_->PopAxisAlignedClip();

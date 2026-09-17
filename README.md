@@ -27,8 +27,8 @@ ExileKit is not affiliated with or endorsed by Grinding Gear Games. Path of Exil
 ## 使用
 
 1. 新用户 Home 显示欢迎语。近期重复成功使用的工具会自动加入；POE / POE2 中右键工具可以 Add to Home 或 Pin。
-2. Home 右上角 `+` 支持输入 HTTPS 网址、域名、EXE / LNK 路径，也可 Browse 选择文件。名称与图标自动获取，网页信息在后台补齐。
-3. 点击整张卡片打开网站或启动程序；工具库中尚未配置的程序先选择其 EXE。选择文件本身不会执行。
+2. Home 网格中的 `+ 添加快捷方式 / Add Shortcut` 支持输入 HTTPS 网址、域名、EXE / LNK 路径，也可 Browse 选择文件；Home 内可用 Ctrl+N 打开添加弹窗。名称与图标自动获取，网页信息在后台补齐。
+3. Home / POE / POE2 统一显示图标与名称；悬浮查看描述和状态，左键打开网站或启动程序，右键管理。工具库中尚未配置的程序先选择其 EXE，选择文件本身不会执行。
 4. Home 右键可固定、取消固定或移除。移除保留工具数据和磁盘文件；普通启动不会撤销用户的移除决定，重新添加可恢复。
 5. Settings 可选 7 / 30 / 90 天或从不自动移除，默认 30 天；固定项目不自动移除。这里也可切换语言、更改未来受管工具目录。
 
@@ -46,8 +46,9 @@ Home 不设固定项目数量上限。收藏和最近使用数据继续保留；
 - [15 个工具的分类、游戏支持与来源](docs/catalog.md)
 - [安全边界](docs/security.md)
 - [M3 验证记录](docs/milestone-3.md) / [性能记录](docs/performance.md) / [历史 M2.5 验收](docs/acceptance.md)
+- [Icon Grid UI 调整与验证](docs/ui-refresh.md)
 
-CTest 覆盖解析、搜索、配置、Home 时间规则、真实 EXE / LNK 启动、网络缓存与异常、网络阻塞时本地操作和取消、完整应用流程及双语五档 DPI 绘制。scripts/smoke.ps1 是开发专用真实窗口测试；加 -LaunchWeb 会打开默认浏览器，加 -CustomTarget <path> 会通过原生添加弹窗添加并启动指定程序。测试工具不随产品分发。
+CTest 覆盖解析、搜索、配置、Home 时间规则、真实 EXE / LNK 启动、网络缓存与异常、网络阻塞时本地操作和取消、完整应用流程、双语五档 DPI 绘制及原生窗口交互。窗口交互测试需要可交互的 Windows 桌面；scripts/smoke.ps1 是开发专用真实窗口测试，加 -LaunchWeb 会打开默认浏览器，加 -CustomTarget <path> 会通过原生添加弹窗添加并启动指定程序。测试工具不随产品分发。
 
 图标接入可通过 `./scripts/smoke.ps1 -VerifyApplicationIcon -WarmSamples 0` 验证，覆盖窗口图标句柄与缩放更新。
 

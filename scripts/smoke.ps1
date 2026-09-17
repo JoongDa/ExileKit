@@ -157,7 +157,7 @@ try {
     $search = [ToolboxSmoke]::GetDlgItem($window, 1001)
     $add = [ToolboxSmoke]::GetDlgItem($window, 1002)
     Assert-True ($search -ne [IntPtr]::Zero) 'Search edit control missing'
-    Assert-True ($add -ne [IntPtr]::Zero) 'Add shortcut button missing'
+    Assert-True ($add -eq [IntPtr]::Zero) 'Obsolete toolbar Add button still exists'
     $client = [ToolboxSmoke+Rect]::new()
     [ToolboxSmoke]::GetClientRect($window, [ref]$client) | Out-Null
     Click-Dip $window 70 256 $actualDpi
@@ -167,7 +167,9 @@ try {
     Assert-True ((Read-WindowText $window) -eq 'ExileKit — Settings') 'English Settings click did not update window title'
     Click-Dip $window 70 124 $actualDpi
     if ($CustomTarget) {
-        [ToolboxSmoke]::PostMessage($window, 0x111, [IntPtr]1002, $add) | Out-Null
+        # Fresh Home's Add Shortcut is a drawn grid item, not a toolbar button.
+        $addX = [int](300 * $actualDpi / 96); $addY = [int](280 * $actualDpi / 96)
+        [ToolboxSmoke]::PostMessage($window, 0x201, [IntPtr]::Zero, [IntPtr]($addX -bor ($addY -shl 16))) | Out-Null
         $dialogWatch = [Diagnostics.Stopwatch]::StartNew()
         do {
             $dialog = [ToolboxSmoke]::FindWindow($process.Id, '#32770')
@@ -195,14 +197,13 @@ try {
         Click-Dip $window 70 $view[0] $actualDpi
         Assert-True ((Read-WindowText $window) -eq "ExileKit — $($view[1])") 'Game navigation did not change page'
     }
+    # A dense icon grid fits in a large window; use a short viewport to exercise scrolling and filtering.
+    [ToolboxSmoke]::SetWindowPos($window, [IntPtr]::Zero, 20, 20, [int](800*$actualDpi/96), [int](520*$actualDpi/96), 0x14) | Out-Null
     $allExtent = (Get-Scroll $window).Max
     Set-Search $search 'poe.ninja'
     Assert-True ((Get-Scroll $window).Max -lt $allExtent) "Search did not reduce real tool layout ($allExtent -> $((Get-Scroll $window).Max))"
     if ($LaunchWeb) {
-        $contentWidth = $client.Right * 96 / $actualDpi - 220 - 48
-        $columns = [math]::Max(1, [math]::Floor(($contentWidth + 16) / (260 + 16)))
-        $cardWidth = ($contentWidth - ($columns - 1) * 16) / $columns
-        Click-Dip $window (244 + $cardWidth / 2) 220 $actualDpi
+        Click-Dip $window 300 180 $actualDpi
     }
     Set-Search $search '流放之路 tools'
     Set-Search $search ''

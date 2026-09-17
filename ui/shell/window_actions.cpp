@@ -3,22 +3,49 @@
 #include "utf.h"
 #include "shortcut_dialog.h"
 #include <commctrl.h>
+#include <algorithm>
 namespace poetoolbox::ui {
+void MainWindow::HideToolTooltip() {
+    if (tooltip_) {
+        SendMessageW(tooltip_, TTM_POP, 0, 0);
+        SendMessageW(tooltip_, TTM_ACTIVATE, FALSE, 0);
+    }
+    toolTooltip_.clear();
+}
+void MainWindow::UpdateToolTooltip(D2D1_POINT_2F point) {
+    if (!tooltip_)
+        return;
+    const auto content = page_.Tooltip(point);
+    if (!content) {
+        if (!toolTooltip_.empty())
+            HideToolTooltip();
+        return;
+    }
+    const float scale = dpi_ / 96;
+    const RECT rect{static_cast<LONG>(content->rect.left * scale), static_cast<LONG>(content->rect.top * scale),
+                    static_cast<LONG>(content->rect.right * scale), static_cast<LONG>(content->rect.bottom * scale)};
+    if (toolTooltip_ == content->text && EqualRect(&tooltipRect_, &rect))
+        return;
+    SendMessageW(tooltip_, TTM_POP, 0, 0);
+    toolTooltip_ = content->text;
+    tooltipRect_ = rect;
+    TOOLINFOW tip{sizeof(tip)};
+    tip.hwnd = window_;
+    tip.uId = 1;
+    tip.rect = rect;
+    tip.lpszText = toolTooltip_.data();
+    SendMessageW(tooltip_, TTM_NEWTOOLRECTW, 0, reinterpret_cast<LPARAM>(&tip));
+    SendMessageW(tooltip_, TTM_UPDATETIPTEXTW, 0, reinterpret_cast<LPARAM>(&tip));
+    SendMessageW(tooltip_, TTM_SETMAXTIPWIDTH, 0, static_cast<LPARAM>(320 * scale));
+    SendMessageW(tooltip_, TTM_ACTIVATE, TRUE, 0);
+}
 void MainWindow::RefreshContent(bool resetScroll) {
     page_.Refresh(resetScroll);
     controlsUpdating_ = true;
     const auto cue = Utf16(services_.Tr("search.placeholder"));
     SendMessageW(search_, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(cue.c_str()));
     SetWindowTextW(window_, (L"ExileKit — " + page_.Title()).c_str());
-    addTooltip_ = Utf16(services_.Tr("shortcut.add"));
-    if (tooltip_) {
-        TOOLINFOW tip{sizeof(tip)};
-        tip.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
-        tip.hwnd = window_;
-        tip.uId = reinterpret_cast<UINT_PTR>(add_);
-        tip.lpszText = addTooltip_.data();
-        SendMessageW(tooltip_, TTM_UPDATETIPTEXTW, 0, reinterpret_cast<LPARAM>(&tip));
-    }
+    HideToolTooltip();
     controlsUpdating_ = false;
     Layout();
     UpdateScrollBar();
@@ -61,6 +88,7 @@ void MainWindow::HandleAction(PageAction action) {
     const auto *data = services_.Data();
     if (!data)
         return;
+    HideToolTooltip();
     switch (action.kind) {
     case PageActionKind::AddShortcut: {
         const auto value = ShowAddShortcutDialog(window_, services_);
@@ -185,10 +213,12 @@ void MainWindow::ShowToolMenu(const std::string &id, POINT point) {
     add(PageActionKind::Open, "action.open");
     const auto entry = data->config.home.find(id);
     const bool pinned = entry != data->config.home.end() && entry->second.pinned && !entry->second.hiddenFromHome;
-    if (page_.View() != LibraryView::Home)
+    const auto homeIds = services_.HomeIds();
+    const bool inHome = std::find(homeIds.begin(), homeIds.end(), id) != homeIds.end();
+    if (!inHome)
         add(PageActionKind::AddHome, "home.add");
     add(pinned ? PageActionKind::Unpin : PageActionKind::PinHome, pinned ? "home.unpin" : "home.pin");
-    if (page_.View() == LibraryView::Home)
+    if (inHome)
         add(PageActionKind::RemoveHome, "home.remove");
     if (tool) {
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);

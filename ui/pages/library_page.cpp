@@ -40,7 +40,7 @@ void LibraryPage::Refresh(bool resetScroll) {
         }
         const auto matching = data->registry.Search(query_, GameFilter::All, {}, data->locale.GetCurrentLanguage());
         for (const auto &id : ids) {
-            ToolCardModel card;
+            ToolIconModel card;
             card.id = id;
             if (const auto *tool = data->registry.FindTool(id)) {
                 if (view_ == LibraryView::Home && !query_.empty() &&
@@ -52,7 +52,6 @@ void LibraryPage::Refresh(bool resetScroll) {
                 card.description = Utf16(Localize(m.description, data->locale.GetCurrentLanguage()));
                 card.application = m.type == ToolType::Application;
                 card.installed = data->installed.contains(id);
-                card.favorite = data->config.favorites.contains(id);
                 card.risk = m.riskLevel == RiskLevel::GameModifying ? T("risk.game_modifying")
                             : m.riskLevel == RiskLevel::Elevated    ? T("risk.elevated")
                                                                     : L"";
@@ -78,7 +77,6 @@ void LibraryPage::Refresh(bool resetScroll) {
             }
             if (auto it = data->config.home.find(id); it != data->config.home.end())
                 card.pinned = it->second.pinned;
-            card.action = T("action.locateShort");
             card.monogram = card.name.empty() ? L"?" : card.name.substr(0, 1);
             if (auto icon = data->icons.find(id); icon != data->icons.end())
                 card.icon = icon->second;
@@ -87,7 +85,7 @@ void LibraryPage::Refresh(bool resetScroll) {
     }
     if (resetScroll)
         scroll_.Set(0);
-    hoverCard_ = -1;
+    hoverItem_ = -1;
     Layout();
 }
 void LibraryPage::Resize(float width, float height) {
@@ -96,14 +94,17 @@ void LibraryPage::Resize(float width, float height) {
     Layout();
 }
 void LibraryPage::Layout() {
-    cards_.clear();
-    const Grid grid(std::max(1.0f, width_ - sidebar - 48));
-    for (size_t i = 0; i < models_.size(); ++i) {
-        const float x = sidebar + 24 + static_cast<float>(i % grid.columns) * (grid.cardWidth + Grid::gap);
-        const float y = 78 + static_cast<float>(i / grid.columns) * (Grid::cardHeight + Grid::gap);
-        cards_.push_back({i, D2D1::RectF(x, y, x + grid.cardWidth, y + Grid::cardHeight)});
+    items_.clear();
+    const ToolIconGrid grid(std::max(1.0f, width_ - sidebar - 48));
+    const bool home = view_ == LibraryView::Home;
+    const float start = home && homeEmpty_ ? 184.0f : home && models_.empty() ? 138.0f : 78.0f;
+    const size_t count = Settings() ? 0 : models_.size() + (home ? 1 : 0);
+    for (size_t i = 0; i < count; ++i) {
+        const float x = sidebar + 24 + static_cast<float>(i % grid.columns) * (grid.itemWidth + ToolIconGrid::gap);
+        const float y = start + static_cast<float>(i / grid.columns) * (ToolIconGrid::itemHeight + ToolIconGrid::gap);
+        items_.push_back({i, D2D1::RectF(x, y, x + grid.itemWidth, y + ToolIconGrid::itemHeight)});
     }
-    scroll_.SetExtent(Settings() ? 780 : 78 + grid.Height(models_.size()) + 28, ViewportHeight());
+    scroll_.SetExtent(Settings() ? 780 : start + grid.Height(count) + 28, ViewportHeight());
 }
 void LibraryPage::Draw(Renderer &r) {
     r.Fill(D2D1::RectF(0, 0, sidebar, height_), 0x171c24);
@@ -148,20 +149,28 @@ void LibraryPage::Draw(Renderer &r) {
         r.Text(T("settings.securityDescription"), D2D1::RectF(x, y + 524, width_ - 24, y + 610), 0xa8b4c4);
         r.Text(T("about.description"), D2D1::RectF(x, y + 630, width_ - 24, y + 681), 0xf1f3f6);
         r.Text(T("about.disclaimer"), D2D1::RectF(x, y + 686, width_ - 24, y + 749), 0x8795a7);
-    } else if (view_ == LibraryView::Home && homeEmpty_) {
-        r.Text(T("home.welcome"), D2D1::RectF(x, y + 44, width_ - 30, y + 88), 0xf1f3f6, true);
-        r.Text(T("home.welcomeBody"), D2D1::RectF(x, y + 108, width_ - 44, y + 208), 0xa2adbd);
     } else {
-        r.Text(Title(), D2D1::RectF(x, y, width_ - 24, y + 36), 0xf1f3f6, true);
-        if (cards_.empty())
+        if (view_ == LibraryView::Home && homeEmpty_) {
+            r.Text(T("home.welcome"), D2D1::RectF(x, y + 20, width_ - 30, y + 58), 0xf1f3f6, true);
+            r.Text(T("home.welcomeBody"), D2D1::RectF(x, y + 70, width_ - 30, y + 142), 0xa2adbd);
+        } else {
+            r.Text(Title(), D2D1::RectF(x, y, width_ - 24, y + 36), 0xf1f3f6, true);
+        }
+        if (models_.empty() && !(view_ == LibraryView::Home && homeEmpty_))
             r.Text(T("app.empty"), D2D1::RectF(x, y + 76, width_ - 24, y + 135), 0xa8b4c4);
-        for (size_t i = 0; i < cards_.size(); ++i) {
-            auto rect = cards_[i].rect;
+        for (size_t i = 0; i < items_.size(); ++i) {
+            auto rect = items_[i].rect;
             rect.top += top - scroll_.Offset();
             rect.bottom += top - scroll_.Offset();
             if (rect.bottom < top || rect.top > height_ - footer)
                 continue;
-            DrawToolCard(r, models_[cards_[i].model], rect, static_cast<int>(i) == hoverCard_, false);
+            if (items_[i].model < models_.size()) {
+                DrawToolIconItem(r, models_[items_[i].model], rect, static_cast<int>(i) == hoverItem_);
+            } else {
+                ToolIconModel add;
+                add.name = T("shortcut.add");
+                DrawToolIconItem(r, add, rect, static_cast<int>(i) == hoverItem_, true);
+            }
         }
     }
     r.PopClip();
@@ -180,22 +189,22 @@ void LibraryPage::Draw(Renderer &r) {
     }
     r.Text(status, D2D1::RectF(sidebar + 16, height_ - footer + 8, width_ - 8, height_), 0x98a6b8);
 }
-int LibraryPage::HitCard(D2D1_POINT_2F p) const {
+int LibraryPage::HitItem(D2D1_POINT_2F p) const {
     if (p.x < sidebar || p.y < top || p.y >= height_ - footer)
         return -1;
     p.y += scroll_.Offset() - top;
-    for (size_t i = 0; i < cards_.size(); ++i)
-        if (Contains(cards_[i].rect, p))
+    for (size_t i = 0; i < items_.size(); ++i)
+        if (Contains(items_[i].rect, p))
             return static_cast<int>(i);
     return -1;
 }
 bool LibraryPage::MouseMove(D2D1_POINT_2F p) {
-    const auto oldNav = hoverNav_, oldCard = hoverCard_;
+    const auto oldNav = hoverNav_, oldCard = hoverItem_;
     hoverNav_ = -1;
     if (p.x >= 12 && p.x < sidebar - 12 && p.y >= 102 && p.y < 278)
         hoverNav_ = static_cast<int>((p.y - 102) / 44);
-    hoverCard_ = HitCard(p);
-    return oldNav != hoverNav_ || oldCard != hoverCard_;
+    hoverItem_ = HitItem(p);
+    return oldNav != hoverNav_ || oldCard != hoverItem_;
 }
 PageAction LibraryPage::Click(D2D1_POINT_2F p) {
     MouseMove(p);
@@ -226,24 +235,46 @@ PageAction LibraryPage::Click(D2D1_POINT_2F p) {
         }
         return {};
     }
-    if (hoverCard_ < 0)
+    if (hoverItem_ < 0)
         return {};
-    const auto &placement = cards_[hoverCard_];
+    const auto &placement = items_[hoverItem_];
+    if (placement.model == models_.size())
+        return {PageActionKind::AddShortcut, {}};
     const auto &model = models_[placement.model];
-    if (p.x >= placement.rect.right - 38 && p.y + scroll_.Offset() - top < placement.rect.top + 54)
-        return {PageActionKind::ContextMenu, model.id};
     return {model.application && !model.installed ? PageActionKind::Locate : PageActionKind::Open, model.id};
 }
 std::string LibraryPage::ContextTool(D2D1_POINT_2F p) const {
-    const auto i = HitCard(p);
-    return i < 0 ? std::string{} : models_[cards_[i].model].id;
+    const auto i = HitItem(p);
+    return i < 0 || items_[i].model >= models_.size() ? std::string{} : models_[items_[i].model].id;
+}
+std::optional<ToolTooltip> LibraryPage::Tooltip(D2D1_POINT_2F point) const {
+    const auto index = HitItem(point);
+    if (index < 0 || !services_.Data())
+        return std::nullopt;
+    const auto &item = items_[index];
+    auto rect = item.rect;
+    rect.top = std::max(top, rect.top + top - scroll_.Offset());
+    rect.bottom = std::min(height_ - footer, rect.bottom + top - scroll_.Offset());
+    if (item.model == models_.size())
+        return ToolTooltip{T("shortcut.add") + L"\n" + T("shortcut.prompt"), rect};
+    const auto &model = models_[item.model];
+    std::wstring text = model.name;
+    if (!model.description.empty())
+        text += L"\n" + model.description;
+    if (model.application && !model.installed)
+        text += L"\n" + T("status.notConfigured");
+    if (!model.risk.empty())
+        text += L"\n" + model.risk;
+    if (model.pinned)
+        text += L"\n" + T("home.pinned");
+    return ToolTooltip{std::move(text), rect};
 }
 bool LibraryPage::Scroll(float delta) {
-    hoverCard_ = -1;
+    hoverItem_ = -1;
     return scroll_.Move(delta);
 }
 bool LibraryPage::ScrollTo(float offset) {
-    hoverCard_ = -1;
+    hoverItem_ = -1;
     return scroll_.Set(offset);
 }
 void LibraryPage::UpdateIcon(std::string_view id) {
@@ -260,15 +291,16 @@ void LibraryPage::UpdateIcon(std::string_view id) {
 }
 std::vector<std::string> LibraryPage::VisibleToolIds() const {
     std::vector<std::string> ids;
-    for (const auto &card : cards_)
-        if (card.rect.bottom >= scroll_.Offset() && card.rect.top <= scroll_.Offset() + ViewportHeight())
+    for (const auto &card : items_)
+        if (card.model < models_.size() && card.rect.bottom >= scroll_.Offset() &&
+            card.rect.top <= scroll_.Offset() + ViewportHeight())
             ids.push_back(models_[card.model].id);
     return ids;
 }
 std::vector<D2D1_RECT_F> LibraryPage::IconRects(std::string_view id) const {
     std::vector<D2D1_RECT_F> rects;
-    for (const auto &card : cards_)
-        if (models_[card.model].id == id) {
+    for (const auto &card : items_)
+        if (card.model < models_.size() && models_[card.model].id == id) {
             auto r = card.rect;
             r.top += top - scroll_.Offset();
             r.bottom += top - scroll_.Offset();
