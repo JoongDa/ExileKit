@@ -32,6 +32,9 @@ class MainWindow final {
     UINT iconResource_ = 0;
     HICON windowBigIcon_ = nullptr;
     HICON windowSmallIcon_ = nullptr;
+    HICON classBigIcon_ = nullptr;
+    HICON classSmallIcon_ = nullptr;
+    HINSTANCE classInstance_ = nullptr;
     float dpi_ = 96;
     Renderer renderer_;
     Logger &logger_;

@@ -61,6 +61,25 @@ void FilterIco(const std::filesystem::path &source, const std::filesystem::path 
     }
     Write(output, result);
 }
+void VerifyAppIco(const std::filesystem::path &source) {
+    const auto bytes = Bytes(source);
+    const std::vector<unsigned> sizes{16, 20, 24, 28, 32, 40, 48, 56, 64, 96, 128, 256};
+    Check(bytes.size() >= 6 + sizes.size() * 16 && bytes[4] == sizes.size() && bytes[5] == 0,
+          "Application ICO is missing native DPI sizes");
+    for (size_t i = 0; i < sizes.size(); ++i) {
+        const auto entry = bytes.data() + 6 + i * 16;
+        const auto size = sizes[i];
+        Check((entry[0] ? entry[0] : 256u) == size && entry[0] == entry[1] && entry[6] == 32,
+              "Application ICO frame has the wrong dimensions/depth");
+        const auto length = U32(entry + 8), offset = U32(entry + 12);
+        Check(static_cast<size_t>(offset) + length <= bytes.size(), "Invalid application ICO frame");
+        const auto image = IconProvider::DecodeBytes(std::span(bytes).subspan(offset, length), size);
+        Check(image && image->width == size && image->height == size, "Application ICO frame cannot be decoded");
+        const auto alpha = [&](unsigned x, unsigned y) { return image->bgra[(y * size + x) * 4 + 3]; };
+        Check(alpha(0, 0) == 0 && alpha(size - 1, size - 1) == 0 && alpha(size / 2, size / 4) == 0,
+              "Application ICO has an opaque background");
+    }
+}
 void Report(std::string_view name, const IconPixels &icon, float dpi) {
     std::cout << name << " dpi=" << dpi << " requested=" << icon.requestedPx
               << " shell-request=" << IconProvider::SourcePixels(icon.requestedPx) << " source=" << icon.source << ' '
@@ -164,6 +183,7 @@ int wmain(int argc, wchar_t **argv) {
     try {
         const std::filesystem::path root(argv[1]), output = std::filesystem::absolute(argv[2]), exe(argv[3]);
         std::filesystem::create_directories(output);
+        VerifyAppIco(root / L"apps/toolbox/exilekit.ico");
         const auto sparse = output / L"16-32-48-256.ico", tinyFile = output / L"16-only.ico";
         FilterIco(root / L"apps/toolbox/exilekit.ico", sparse, false);
         FilterIco(root / L"apps/toolbox/exilekit.ico", tinyFile, true);

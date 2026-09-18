@@ -11,6 +11,12 @@ MainWindow::~MainWindow() {
     services_.Stop();
     if (window_ && IsWindow(window_))
         DestroyWindow(window_);
+    if (classInstance_)
+        UnregisterClassW(L"POEToolbox.MainWindow", classInstance_);
+    if (classBigIcon_)
+        DestroyIcon(classBigIcon_);
+    if (classSmallIcon_)
+        DestroyIcon(classSmallIcon_);
     ReleaseWindowIcons();
     if (searchFont_)
         DeleteObject(searchFont_);
@@ -23,21 +29,31 @@ int MainWindow::Run(HINSTANCE instance, int show, UINT iconResource) {
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = instance;
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-    wc.hIcon =
-        iconResource_ ? LoadIconW(instance, MAKEINTRESOURCEW(iconResource_)) : LoadIconW(nullptr, IDI_APPLICATION);
-    wc.hIconSm =
-        iconResource_
-            ? static_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(iconResource_), IMAGE_ICON,
-                                            GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED))
-            : wc.hIcon;
+    const auto startupDpi = GetDpiForSystem();
+    // LR_SHARED caches by resource name, not requested size. Own both class icons
+    // so loading the big icon cannot make Windows reuse it as the small icon.
+    if (iconResource_) {
+        classBigIcon_ = static_cast<HICON>(LoadImageW(
+            instance, MAKEINTRESOURCEW(iconResource_), IMAGE_ICON, GetSystemMetricsForDpi(SM_CXICON, startupDpi),
+            GetSystemMetricsForDpi(SM_CYICON, startupDpi), 0));
+        classSmallIcon_ = static_cast<HICON>(LoadImageW(
+            instance, MAKEINTRESOURCEW(iconResource_), IMAGE_ICON, GetSystemMetricsForDpi(SM_CXSMICON, startupDpi),
+            GetSystemMetricsForDpi(SM_CYSMICON, startupDpi), 0));
+    }
+    wc.hIcon = classBigIcon_ ? classBigIcon_ : static_cast<HICON>(LoadImageW(
+        nullptr, IDI_APPLICATION, IMAGE_ICON, GetSystemMetricsForDpi(SM_CXICON, startupDpi),
+        GetSystemMetricsForDpi(SM_CYICON, startupDpi), LR_SHARED));
+    wc.hIconSm = classSmallIcon_ ? classSmallIcon_ : static_cast<HICON>(LoadImageW(
+        nullptr, IDI_APPLICATION, IMAGE_ICON, GetSystemMetricsForDpi(SM_CXSMICON, startupDpi),
+        GetSystemMetricsForDpi(SM_CYSMICON, startupDpi), LR_SHARED));
     wc.lpszClassName = L"POEToolbox.MainWindow";
     if (!RegisterClassExW(&wc))
         return 1;
+    classInstance_ = instance;
     if (FAILED(renderer_.Initialize())) {
         logger_.Write(LogLevel::Error, L"Renderer initialization failed.");
         return 1;
     }
-    const auto startupDpi = GetDpiForSystem();
     window_ = CreateWindowExW(0, wc.lpszClassName, L"ExileKit", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_VSCROLL,
                               CW_USEDEFAULT, CW_USEDEFAULT, MulDiv(1200, static_cast<int>(startupDpi), 96),
                               MulDiv(800, static_cast<int>(startupDpi), 96), nullptr, nullptr, instance, this);
@@ -361,6 +377,7 @@ void MainWindow::UpdateWindowIcons() {
         return;
     const auto instance = reinterpret_cast<HINSTANCE>(GetWindowLongPtrW(window_, GWLP_HINSTANCE));
     const UINT dpi = static_cast<UINT>(dpi_);
+    // Keep distinct, non-shared handles at the current monitor's native sizes.
     for (const auto kind : {ICON_BIG, ICON_SMALL}) {
         const auto icon =
             static_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(iconResource_), IMAGE_ICON,

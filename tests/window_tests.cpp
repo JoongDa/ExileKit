@@ -46,6 +46,55 @@ struct Popup {
     HMENU menu;
     HWND owner;
 };
+void VerifyIcon(HICON icon, int width, int height) {
+    Require(icon != nullptr, "Window icon is missing.");
+    ICONINFO info{};
+    Require(GetIconInfo(icon, &info), "Cannot inspect window icon.");
+    BITMAP bitmap{};
+    GetObjectW(info.hbmColor, sizeof(bitmap), &bitmap);
+    BITMAPINFO format{};
+    format.bmiHeader = {sizeof(BITMAPINFOHEADER), width, -height, 1, 32, BI_RGB};
+    std::vector<unsigned char> pixels(static_cast<size_t>(width) * height * 4);
+    const auto dc = CreateCompatibleDC(nullptr);
+    const auto lines = GetDIBits(dc, info.hbmColor, 0, height, pixels.data(), &format, DIB_RGB_COLORS);
+    DeleteDC(dc);
+    DeleteObject(info.hbmColor);
+    DeleteObject(info.hbmMask);
+    Require(bitmap.bmWidth == width && bitmap.bmHeight == height, "Window icon loaded at the wrong size.");
+    Require(lines == height, "Cannot inspect window icon alpha.");
+    const auto alpha = [&](int x, int y) { return pixels[(static_cast<size_t>(y) * width + x) * 4 + 3]; };
+    Require(alpha(0, 0) == 0 && alpha(width - 1, height - 1) == 0 && alpha(width / 2, height / 4) == 0,
+            "Window icon still contains an opaque background.");
+    bool opaque = false, feathered = false;
+    for (size_t i = 3; i < pixels.size(); i += 4) {
+        opaque |= pixels[i] == 255;
+        feathered |= pixels[i] > 0 && pixels[i] < 255;
+    }
+    Require(opaque && feathered, "Window icon lost its artwork or antialiased edges.");
+}
+void VerifyWindowIcons(HWND window) {
+    const auto systemDpi = GetDpiForSystem();
+    VerifyIcon(reinterpret_cast<HICON>(GetClassLongPtrW(window, GCLP_HICON)),
+               GetSystemMetricsForDpi(SM_CXICON, systemDpi), GetSystemMetricsForDpi(SM_CYICON, systemDpi));
+    VerifyIcon(reinterpret_cast<HICON>(GetClassLongPtrW(window, GCLP_HICONSM)),
+               GetSystemMetricsForDpi(SM_CXSMICON, systemDpi), GetSystemMetricsForDpi(SM_CYSMICON, systemDpi));
+    const auto verify = [&](UINT dpi) {
+        const auto bigIcon = reinterpret_cast<HICON>(SendMessageW(window, WM_GETICON, ICON_BIG, 0));
+        const auto smallIcon = reinterpret_cast<HICON>(SendMessageW(window, WM_GETICON, ICON_SMALL, 0));
+        Require(bigIcon != smallIcon, "Small and big window icons share a handle.");
+        VerifyIcon(bigIcon, GetSystemMetricsForDpi(SM_CXICON, dpi), GetSystemMetricsForDpi(SM_CYICON, dpi));
+        VerifyIcon(smallIcon, GetSystemMetricsForDpi(SM_CXSMICON, dpi), GetSystemMetricsForDpi(SM_CYSMICON, dpi));
+    };
+    const auto originalDpi = GetDpiForWindow(window);
+    verify(originalDpi);
+    RECT rect{};
+    GetWindowRect(window, &rect);
+    for (UINT dpi : {96u, 120u, 144u, 168u, 192u, 288u}) {
+        SendMessageW(window, WM_DPICHANGED, MAKELONG(dpi, dpi), reinterpret_cast<LPARAM>(&rect));
+        verify(dpi);
+    }
+    SendMessageW(window, WM_DPICHANGED, MAKELONG(originalDpi, originalDpi), reinterpret_cast<LPARAM>(&rect));
+}
 Popup OpenMenu(HWND window, DWORD thread) {
     POINT point{MulDiv(300, GetDpiForWindow(window), 96), MulDiv(180, GetDpiForWindow(window), 96)};
     ClientToScreen(window, &point);
@@ -87,8 +136,9 @@ void Choose(Popup popup, const wchar_t *label) {
 }
 } // namespace
 int wmain(int argc, wchar_t **argv) {
-    if (argc != 3)
+    if (argc != 3 && argc != 4)
         return 1;
+    const bool iconsOnly = argc == 4 && std::wstring_view(argv[3]) == L"--icons-only";
     const auto com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (FAILED(com))
         return 1;
@@ -115,9 +165,15 @@ int wmain(int argc, wchar_t **argv) {
                 Wait(
                     [&] {
                         window = Find(thread, L"POEToolbox.MainWindow");
-                        return window && GetPropW(window, L"POEToolbox.RegistryReady");
+                        return window && (iconsOnly ? GetDlgItem(window, 1001) != nullptr
+                                                    : GetPropW(window, L"POEToolbox.RegistryReady") != nullptr);
                     },
                     "Application did not become ready.");
+                VerifyWindowIcons(window);
+                if (iconsOnly) {
+                    PostMessageW(window, WM_CLOSE, 0, 0);
+                    return;
+                }
                 Require(!GetDlgItem(window, 1002), "Toolbar Add button must be removed.");
                 const UINT dpi = GetDpiForWindow(window);
                 const auto point = MAKELPARAM(MulDiv(300, dpi, 96), MulDiv(180, dpi, 96));
@@ -204,11 +260,12 @@ int wmain(int argc, wchar_t **argv) {
                 PostThreadMessageW(thread, WM_QUIT, 1, 0);
             }
         });
-        const auto exit = main.Run(GetModuleHandleW(nullptr), SW_SHOWNORMAL, IDI_EXILEKIT);
+        const auto exit = main.Run(GetModuleHandleW(nullptr), iconsOnly ? SW_HIDE : SW_SHOWNORMAL, IDI_EXILEKIT);
         driver.join();
         Require(failure.empty(), failure.c_str());
         Require(exit == 0, "Window did not close normally.");
-        std::cout << "Native hover popup, dynamic Pin/Unpin/Remove menu and Home Add dialog passed.\n";
+        std::cout << (iconsOnly ? "Class/window icon sizes, transparency and DPI changes passed.\n"
+                               : "Native hover popup, dynamic Pin/Unpin/Remove menu and Home Add dialog passed.\n");
         result = 0;
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';
