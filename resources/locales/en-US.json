@@ -13,6 +13,8 @@
   "filter.poe1": "POE",
   "filter.poe2": "POE2",
   "action.open": "Open",
+  "action.openWebsite": "Open Website",
+  "app.notInstalled": "{name} is not installed.\nOpen the official download page?",
   "action.locate": "Choose a program",
   "action.locateShort": "Locate",
   "action.download": "Website",

@@ -100,8 +100,8 @@ int wmain(int argc, wchar_t **argv) {
         }
         page.SetView(LibraryView::POE);
         page.SetSearch("PoE Overlay");
-        Require(page.Click({300, 180}).kind == PageActionKind::Locate,
-                "Unconfigured applications must retain the existing Locate action.");
+        Require(page.Click({300, 180}).kind == PageActionKind::Open,
+                "Unconfigured applications must use Open so the window can offer the official website.");
         page.SetSearch("");
         services.RemoveFromHome("path-of-exile");
         page.SetView(LibraryView::Home);

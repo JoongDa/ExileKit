@@ -142,10 +142,26 @@ void MainWindow::HandleAction(PageAction action) {
                 services_.Launch(action.id, false);
             break;
         }
-        if (tool->manifest.type == ToolType::Application && !data->installed.contains(action.id) &&
-            tool->manifest.distribution != DistributionType::Managed) {
-            HandleAction({PageActionKind::Locate, action.id});
-            return;
+        if (tool->manifest.type == ToolType::Application && !data->installed.contains(action.id)) {
+            auto message = Utf16(services_.Tr("app.notInstalled",
+                                            "{name} is not installed.\nOpen the official download page?"));
+            if (const auto name = message.find(L"{name}"); name != std::wstring::npos)
+                message.replace(name, 6, Utf16(tool->manifest.name));
+            const auto openWebsite = Utf16(services_.Tr("action.openWebsite"));
+            const auto cancel = Utf16(services_.Tr("action.cancel"));
+            const TASKDIALOG_BUTTON buttons[] = {{IDOK, openWebsite.c_str()}, {IDCANCEL, cancel.c_str()}};
+            TASKDIALOGCONFIG dialog{sizeof(dialog)};
+            dialog.hwndParent = window_;
+            dialog.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
+            dialog.pszWindowTitle = L"ExileKit";
+            dialog.pszContent = message.c_str();
+            dialog.cButtons = static_cast<UINT>(std::size(buttons));
+            dialog.pButtons = buttons;
+            dialog.nDefaultButton = IDCANCEL;
+            int selected = IDCANCEL;
+            if (SUCCEEDED(TaskDialogIndirect(&dialog, &selected, nullptr, nullptr)) && selected == IDOK)
+                services_.OpenDownloadPage(action.id);
+            break;
         }
         if (tool->manifest.distribution == DistributionType::Managed) {
             services_.ReportError({ErrorCode::UnsupportedOperation, "Package management is not available."});

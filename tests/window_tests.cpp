@@ -250,6 +250,36 @@ int wmain(int argc, wchar_t **argv) {
                     "Shortcut dialog did not finish initialization.");
                 SendMessageW(dialog, WM_CLOSE, 0, 0);
                 Wait([&] { return !IsWindow(dialog); }, "Shortcut dialog did not close.");
+                // Both the icon and context-menu Open must offer a website, never a file picker.
+                SendMessageW(window, WM_LBUTTONDOWN, 0, MAKELPARAM(MulDiv(100, dpi, 96), MulDiv(160, dpi, 96)));
+                SetWindowTextW(GetDlgItem(window, 1001), L"PoE Overlay");
+                for (const bool contextMenu : {false, true}) {
+                    if (contextMenu) {
+                        popup = OpenMenu(window, thread);
+                        Require(MenuIndex(popup, L"Locate") >= 0, "Explicit Locate action must remain available.");
+                        Choose(popup, L"Open");
+                    } else {
+                        PostMessageW(window, WM_LBUTTONDOWN, 0, point);
+                    }
+                    Wait(
+                        [&] {
+                            dialog = Find(thread, L"#32770");
+                            return dialog && IsWindowVisible(dialog);
+                        },
+                        "Missing-app website prompt did not open.");
+                    std::wstring contents;
+                    EnumChildWindows(dialog, [](HWND child, LPARAM data) -> BOOL {
+                        wchar_t value[1024]{};
+                        GetWindowTextW(child, value, static_cast<int>(std::size(value)));
+                        *reinterpret_cast<std::wstring *>(data) += std::wstring(value) + L"\n";
+                        return TRUE;
+                    }, reinterpret_cast<LPARAM>(&contents));
+                    Require(contents.find(L"Open Website") != std::wstring::npos &&
+                                contents.find(L"Cancel") != std::wstring::npos,
+                            "Missing-app prompt must offer Open Website and Cancel.");
+                    SendMessageW(dialog, TDM_CLICK_BUTTON, IDCANCEL, 0);
+                    Wait([&] { return !IsWindow(dialog); }, "Cancel did not dismiss the missing-app prompt.");
+                }
             } catch (const std::exception &error) {
                 failure = error.what();
             }

@@ -241,7 +241,7 @@ PageAction LibraryPage::Click(D2D1_POINT_2F p) {
     if (placement.model == models_.size())
         return {PageActionKind::AddShortcut, {}};
     const auto &model = models_[placement.model];
-    return {model.application && !model.installed ? PageActionKind::Locate : PageActionKind::Open, model.id};
+    return {PageActionKind::Open, model.id};
 }
 std::string LibraryPage::ContextTool(D2D1_POINT_2F p) const {
     const auto i = HitItem(p);
