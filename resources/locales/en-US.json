@@ -4,7 +4,6 @@
   "app.tagline": "Your tools, one place.",
   "app.empty": "No tools match this view.",
   "nav.home": "Home",
-  "nav.favorites": "Favorites",
   "nav.recent": "Recently used",
   "nav.installed": "Installed",
   "nav.settings": "Settings",
@@ -85,8 +84,6 @@
   "home.days90": "90 days",
   "home.never": "Never",
   "settings.homeRemoval": "Home Auto Removal",
-  "favorite.add": "Add to favorites",
-  "favorite.remove": "Remove from favorites",
   "error.invalidShortcut": "Cannot recognize this website or program path.",
   "about.description": "An open-source toolbox for Path of Exile & Path of Exile 2.",
   "about.disclaimer": "This product isn't affiliated with or endorsed by Grinding Gear Games in any way. Third-party tools, websites, logos, names and trademarks belong to their respective owners."

@@ -8,7 +8,6 @@ enum class PageActionKind {
     Navigate,
     Open,
     Locate,
-    Favorite,
     Download,
     LanguageEnglish,
     LanguageChinese,

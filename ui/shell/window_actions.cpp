@@ -129,9 +129,6 @@ void MainWindow::HandleAction(PageAction action) {
         ShowToolMenu(action.id, point);
         return;
     }
-    case PageActionKind::Favorite:
-        services_.ToggleFavorite(action.id);
-        break;
     case PageActionKind::LanguageEnglish:
         services_.SetLanguage("en-US");
         break;
@@ -221,14 +218,11 @@ void MainWindow::ShowToolMenu(const std::string &id, POINT point) {
     add(pinned ? PageActionKind::Unpin : PageActionKind::PinHome, pinned ? "home.unpin" : "home.pin");
     if (inHome)
         add(PageActionKind::RemoveHome, "home.remove");
-    if (tool) {
+    if (tool && tool->manifest.type == ToolType::Application) {
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-        add(PageActionKind::Favorite, data->config.favorites.contains(id) ? "favorite.remove" : "favorite.add");
-        if (tool->manifest.type == ToolType::Application) {
-            add(PageActionKind::Locate, "action.locateShort");
-            if (!tool->manifest.homepage.empty() || !tool->manifest.downloadPage.empty())
-                add(PageActionKind::Download, "action.download");
-        }
+        add(PageActionKind::Locate, "action.locateShort");
+        if (!tool->manifest.homepage.empty() || !tool->manifest.downloadPage.empty())
+            add(PageActionKind::Download, "action.download");
     }
     const auto command = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, point.x, point.y, window_, nullptr);
     DestroyMenu(menu);

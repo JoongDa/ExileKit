@@ -4,7 +4,6 @@
   "app.tagline": "快速找到，直接打开。",
   "app.empty": "没有符合条件的工具。",
   "nav.home": "首页",
-  "nav.favorites": "收藏",
   "nav.recent": "最近使用",
   "nav.installed": "已配置程序",
   "nav.settings": "设置",
@@ -85,8 +84,6 @@
   "home.days90": "90 天",
   "home.never": "从不",
   "settings.homeRemoval": "Home 自动移除",
-  "favorite.add": "添加到收藏",
-  "favorite.remove": "取消收藏",
   "error.invalidShortcut": "无法识别该网址或程序路径。",
   "about.description": "面向 Path of Exile 与 Path of Exile 2 的开源工具箱。",
   "about.disclaimer": "本产品与 Grinding Gear Games 没有关联，也未获得其认可。第三方工具、网站、Logo、名称及商标属于各自所有者。"
